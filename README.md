@@ -7,6 +7,7 @@ Campus event operations for frequent short events: plan → permissions → reso
 **Audience split:** the website is management-only. Students (college and outside) use the mobile app; the event’s own coordinators and faculty scan with their normal login; there is no student web portal. An account with no staff role and no club membership is told to use the app.
 
 - **Production review and next steps:** [`docs/product-review.md`](docs/product-review.md)
+- **What the last review changed, point by point:** [`docs/critique-response.md`](docs/critique-response.md)
 - **Phase 6 report:** [`docs/phase6-report.md`](docs/phase6-report.md)
 - **Phase 6 critic audit:** [`docs/phase6-audit.md`](docs/phase6-audit.md)
 - Phase 6 verification run: [`docs/phase6-verification.log`](docs/phase6-verification.log)

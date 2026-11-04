@@ -60,7 +60,7 @@ or run `bun run jobs:run` from a machine with the env. This expires holds, advan
 ## 3. Vercel — the management website
 
 1. Import the same repo. Vercel reads `vercel.json`: install `bun install --frozen-lockfile`, build `bun run build:web`, output `apps/web/dist`.
-2. Edit `vercel.json` → replace `YOUR-API.onrender.com` with your Render host (both rewrites). Commit.
+2. Edit `vercel.json` → replace `YOUR-API.onrender.com` with your Render host (both rewrites). Commit. While that placeholder is still there every `/api/*` call is proxied to a host that does not exist, and sign-in fails with a network error rather than a useful message.
 3. Deploy. The website calls `/api/*` on its own origin; Vercel forwards to Render, so the httpOnly refresh cookie is first-party and survives browser cookie blocking.
 4. Set the API's `WEB_ORIGIN` and `APP_BASE_URL` to the final Vercel URL (and redeploy the API).
 5. No Vercel env vars are required. Never add secrets as `VITE_*`.

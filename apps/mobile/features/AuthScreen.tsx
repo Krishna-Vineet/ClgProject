@@ -1,9 +1,11 @@
+import { CONSENT_POLICY } from "@campusops/shared/ui";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { Logo } from "../components/icons";
 import {
   Button,
   Card,
+  Checkbox,
   Chip,
   Field,
   Muted,
@@ -50,6 +52,9 @@ export function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Registration stores this next to the policy version, so the API refuses the
+  // request unless it is actually true.
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   useEffect(() => {
     if (mode === "college" && departments.length === 0)
@@ -118,6 +123,8 @@ export function AuthScreen() {
           );
         if (mode === "college" && graduationYear && !/^20\d{2}$/.test(graduationYear))
           throw new Error("Enter a valid four-digit graduation year.");
+        if (!consentAccepted)
+          throw new Error("Tick the consent box so we know you agree to the data notice.");
         const trimmedPhone = phone.trim();
         if (trimmedPhone && !/^[+\d][\d\s-]{6,19}$/.test(trimmedPhone))
           throw new Error("Enter a phone number with 7 to 15 digits, or leave it blank.");
@@ -125,6 +132,7 @@ export function AuthScreen() {
           email: normalized,
           password,
           fullName: fullName.trim(),
+          consentAccepted: true,
           ...(trimmedPhone ? { phone: trimmedPhone } : {}),
           institutionName:
             mode === "college" ? (config?.institutionName ?? "Campus") : institutionName.trim(),
@@ -400,10 +408,20 @@ export function AuthScreen() {
             onPress={() => setShowPassword((value) => !value)}
           />
         )}
+        {registering && (
+          <Checkbox
+            checked={consentAccepted}
+            onToggle={() => setConsentAccepted((value) => !value)}
+            label="I agree to the data notice"
+            hint={`${CONSENT_POLICY.summary} Policy ${CONSENT_POLICY.version}.`}
+            testID="consent"
+          />
+        )}
         <Button
           label={labels[mode]}
           onPress={() => void submit()}
           busy={busy}
+          disabled={registering && !consentAccepted}
           testID="auth-submit"
         />
         {mode === "login" && (
@@ -434,7 +452,7 @@ export function AuthScreen() {
           paddingTop: 6,
         }}
       >
-        CampusOps · Made by Vineet
+        CampusOps · Event operations
       </Text>
     </Screen>
   );

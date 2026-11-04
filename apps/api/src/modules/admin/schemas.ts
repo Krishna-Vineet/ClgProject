@@ -62,3 +62,42 @@ export const listUsersSchema = z.object({
     .enum(["PENDING_EMAIL", "PENDING_VERIFICATION", "ACTIVE", "REJECTED", "SUSPENDED"])
     .optional(),
 });
+
+/**
+ * The staff directory as an HOD/Dean sees it. `departmentId` may only narrow the
+ * caller's own scope, never widen it — the service intersects the two.
+ */
+export const staffDirectoryQuerySchema = listStaffSchema.extend({
+  includeInactive: z.coerce.boolean().default(false),
+});
+
+const staffEditBase = z.object({
+  fullName: z.string().trim().min(2).max(120).optional(),
+  phone: phoneInputSchema.nullable().optional(),
+  email: z.string().trim().toLowerCase().email().max(254).optional(),
+  departmentId: z.string().uuid().nullable().optional(),
+  designation: z.string().trim().min(2).max(120).optional(),
+  position: z.enum(STAFF_POSITIONS).optional(),
+  employeeCode: z.string().trim().max(60).nullable().optional(),
+});
+
+/**
+ * Editing a staff record. Email changes go through the verification machinery in
+ * the service (the account is marked unverified and told to confirm), so the
+ * schema only states what the editor intends to change.
+ */
+export const updateStaffSchema = staffEditBase.refine(
+  (v) => Object.values(v).some((value) => value !== undefined),
+  { message: "Nothing to update." },
+);
+
+/** An HOD/Dean may change contact details, not access structure. */
+export const updateStaffContactSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(120).optional(),
+    phone: phoneInputSchema.nullable().optional(),
+    email: z.string().trim().toLowerCase().email().max(254).optional(),
+  })
+  .refine((v) => Object.values(v).some((value) => value !== undefined), {
+    message: "Nothing to update.",
+  });

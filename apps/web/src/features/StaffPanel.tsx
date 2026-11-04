@@ -69,7 +69,8 @@ function statusLabel(status: string) {
 }
 
 export function StaffPanel() {
-  const { me } = useSession();
+  const session = useSession();
+  const me = session.me;
   const toast = useToast();
   const action = useAction();
   const [rows, setRows] = useState<StaffRow[]>([]);
@@ -99,6 +100,51 @@ export function StaffPanel() {
     id: string;
     label: string;
   } | null>(null);
+  /**
+   * An HOD/Dean opens this panel for one department: the API narrows every read
+   * and refuses structural edits, so the UI hides what would only 403 — and says
+   * whose department is on screen, so nobody mistakes it for the whole college.
+   */
+  const isInstitutionAdmin = session.isAdmin;
+  const [editing, setEditing] = useState<StaffRow | null>(null);
+  const [edit, setEdit] = useState({ fullName: "", phone: "", email: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  function openEdit(row: StaffRow) {
+    setEdit({ fullName: row.fullName, phone: row.phone ?? "", email: row.email });
+    setEditing(row);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const result = await api<{
+        emailChanged: boolean;
+        emailVerificationRequired: boolean;
+      }>(
+        `/admin/staff/${editing.id}`,
+        {
+          fullName: edit.fullName.trim(),
+          phone: edit.phone.trim() === "" ? null : edit.phone.trim(),
+          ...(isInstitutionAdmin ? { email: edit.email.trim() } : {}),
+        },
+        { method: "PATCH" },
+      );
+      setEditing(null);
+      await load();
+      toast.ok(
+        result.emailVerificationRequired
+          ? "Saved. The new address must be confirmed before that account can sign in again."
+          : "Staff details saved.",
+      );
+    } catch (err) {
+      toast.err(errorMessage(err));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +177,12 @@ export function StaffPanel() {
       .then((d) => setDepartments(d.items))
       .catch(() => {});
   }, []);
+
+  // An HOD/Dean has no business filtering by a department that is not theirs;
+  // the API would refuse it, so the option is removed rather than left to fail.
+  const visibleDepartments = session.isAdmin
+    ? departments
+    : departments.filter((d) => session.scopedDepartmentIds.includes(d.id));
 
   async function openStaff(id: string) {
     await action.run(async () => {
@@ -212,9 +264,11 @@ export function StaffPanel() {
         title="Staff"
         subtitle="Departments, positions and contact details. Access roles are granted separately."
         actions={
-          <button type="button" onClick={() => setProviding(true)}>
-            Add staff
-          </button>
+          isInstitutionAdmin ? (
+            <button type="button" onClick={() => setProviding(true)}>
+              Add staff
+            </button>
+          ) : null
         }
       >
         <form
@@ -238,7 +292,7 @@ export function StaffPanel() {
               onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
             >
               <option value="">All departments</option>
-              {departments.map((d) => (
+              {visibleDepartments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -311,7 +365,10 @@ export function StaffPanel() {
                           {statusLabel(row.status)}
                         </span>
                       </td>
-                      <td>
+                      <td className="row-actions">
+                        <button type="button" className="ghost tiny" onClick={() => openEdit(row)}>
+                          Edit
+                        </button>
                         <button
                           type="button"
                           className="ghost tiny"
@@ -450,6 +507,53 @@ export function StaffPanel() {
           </div>
         )}
       </Modal>
+
+      <FormDialog
+        open={editing !== null}
+        title="Edit staff details"
+        description={
+          isInstitutionAdmin
+            ? "Changing the email pauses the account until the new address is confirmed."
+            : "You can correct name, phone and email for staff in your department."
+        }
+        submitLabel="Save changes"
+        busy={savingEdit}
+        onClose={() => setEditing(null)}
+        onSubmit={saveEdit}
+      >
+        <div className="grid-2">
+          <Field label="Full name">
+            <input
+              required
+              minLength={2}
+              value={edit.fullName}
+              onChange={(e) => setEdit({ ...edit, fullName: e.target.value })}
+            />
+          </Field>
+          <Field label="Phone" hint="Leave blank to clear the number.">
+            <input
+              value={edit.phone}
+              onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field
+          label="Email"
+          hint={
+            isInstitutionAdmin
+              ? "Used to sign in. A change revokes existing sessions."
+              : "Only an administrator can change the sign-in address."
+          }
+        >
+          <input
+            type="email"
+            required
+            disabled={!isInstitutionAdmin}
+            value={edit.email}
+            onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+          />
+        </Field>
+      </FormDialog>
 
       <FormDialog
         open={providing}

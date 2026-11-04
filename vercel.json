@@ -6,6 +6,7 @@
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
+      "comment": "REPLACE BEFORE DEPLOYING: point this at your API origin. While it still says YOUR-API, /api/* is proxied to a host that does not exist and the front end cannot sign anyone in.",
       "source": "/api/:path*",
       "destination": "https://YOUR-API.onrender.com/api/:path*"
     },

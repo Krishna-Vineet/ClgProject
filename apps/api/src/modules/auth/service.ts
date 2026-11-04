@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { CONSENT_POLICY } from "@campusops/shared";
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { z } from "zod";
 import { authConfig, runtimeDatabaseUrl, shouldExposeDemoOtp } from "../../config/env";
@@ -6,8 +8,11 @@ import {
   authTokens,
   clubMemberships,
   clubs,
+  complaints,
   departments,
+  passes,
   programs,
+  registrations,
   roleAssignments,
   sessions,
   studentProfiles,
@@ -276,6 +281,7 @@ export async function registerCollege(input: z.infer<typeof registerCollegeSchem
           fullName: input.fullName,
           phone: input.phone ?? null,
           consentAcceptedAt: input.consentAccepted ? new Date() : null,
+          consentVersion: input.consentAccepted ? CONSENT_POLICY.version : null,
           passwordUpdatedAt: new Date(),
         })
         .returning();
@@ -327,6 +333,7 @@ export async function registerOutsider(input: z.infer<typeof registerOutsiderSch
           fullName: input.fullName,
           phone: input.phone ?? null,
           consentAcceptedAt: input.consentAccepted ? new Date() : null,
+          consentVersion: input.consentAccepted ? CONSENT_POLICY.version : null,
           passwordUpdatedAt: new Date(),
         })
         .returning();
@@ -424,6 +431,8 @@ export async function login(
     .insert(sessions)
     .values({
       userId: user.id,
+      // A new sign-in starts a new family; this is what reuse detection revokes.
+      familyId: randomUUID(),
       refreshTokenHash: hashToken(refreshToken, cfg.refreshPepper),
       deviceLabel: input.deviceLabel ?? null,
       ipHash: meta.ip ? hashToken(meta.ip, cfg.refreshPepper) : null,
@@ -455,10 +464,13 @@ export async function refreshSession(
     .limit(1);
   if (!session) throw new ApiError("UNAUTHENTICATED", "Invalid refresh token.");
   if (session.revokedAt) {
+    // Reuse means this chain was probably stolen, so the chain is what dies. The
+    // user's other devices are separate families and stay signed in: revoking
+    // everything turned one stale tab into a campus-wide sign-out.
     await db
       .update(sessions)
       .set({ revokedAt: new Date() })
-      .where(and(eq(sessions.userId, session.userId), isNull(sessions.revokedAt)));
+      .where(and(eq(sessions.familyId, session.familyId), isNull(sessions.revokedAt)));
     throw new ApiError("UNAUTHENTICATED", "Refresh token reuse detected.");
   }
   if (session.expiresAt.getTime() < Date.now())
@@ -478,6 +490,7 @@ export async function refreshSession(
       .insert(sessions)
       .values({
         userId: user.id,
+        familyId: session.familyId,
         refreshTokenHash: hashToken(newRefreshToken, cfg.refreshPepper),
         deviceLabel: session.deviceLabel,
         ipHash: meta.ip ? hashToken(meta.ip, cfg.refreshPepper) : session.ipHash,
@@ -671,4 +684,160 @@ export async function getMe(userId: string) {
     globalRoles: roles,
     clubMemberships: memberships,
   };
+}
+
+/**
+ * Everything the institution holds about one person, in one JSON document.
+ *
+ * A consent record with no export or deletion path is decoration. This is the
+ * export half: it reads only rows the caller already owns or is named in, so it
+ * is safe to hand back to the account itself.
+ */
+export async function exportMyData(userId: string) {
+  const { db } = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new ApiError("NOT_FOUND", "User not found.");
+  const [profile] = await db
+    .select()
+    .from(studentProfiles)
+    .where(eq(studentProfiles.userId, userId))
+    .limit(1);
+  const roles = await db
+    .select({
+      role: roleAssignments.role,
+      scopeType: roleAssignments.scopeType,
+      departmentId: roleAssignments.departmentId,
+      grantedAt: roleAssignments.createdAt,
+    })
+    .from(roleAssignments)
+    .where(eq(roleAssignments.userId, userId));
+  const memberships = await db
+    .select({
+      clubId: clubMemberships.clubId,
+      clubRole: clubMemberships.clubRole,
+      isActive: clubMemberships.isActive,
+    })
+    .from(clubMemberships)
+    .where(eq(clubMemberships.userId, userId));
+  const myRegistrations = await db
+    .select({
+      id: registrations.id,
+      eventId: registrations.eventId,
+      status: registrations.status,
+      appliedAt: registrations.appliedAt,
+    })
+    .from(registrations)
+    .where(eq(registrations.userId, userId));
+  const myPasses = await db
+    .select({
+      publicId: passes.publicId,
+      registrationId: passes.registrationId,
+      revokedAt: passes.revokedAt,
+      createdAt: passes.createdAt,
+    })
+    .from(passes)
+    .innerJoin(registrations, eq(registrations.id, passes.registrationId))
+    .where(eq(registrations.userId, userId));
+  const myComplaints = await db
+    .select({
+      id: complaints.id,
+      eventId: complaints.eventId,
+      status: complaints.status,
+      createdAt: complaints.createdAt,
+    })
+    .from(complaints)
+    .where(eq(complaints.reportedBy, userId));
+
+  return {
+    exportedAt: new Date().toISOString(),
+    account: publicUser(user),
+    // Consent is part of the record, including the fact that older rows have no
+    // policy version rather than a version we invented for them.
+    consent: {
+      acceptedAt: user.consentAcceptedAt,
+      policyVersion: user.consentVersion,
+      currentPolicyVersion: CONSENT_POLICY.version,
+      policySummary: CONSENT_POLICY.summary,
+    },
+    studentProfile: profile ?? null,
+    roles,
+    clubMemberships: memberships,
+    registrations: myRegistrations,
+    passes: myPasses,
+    complaintsReportedByMe: myComplaints,
+  };
+}
+
+/**
+ * Erase the person, keep the institution's record.
+ *
+ * A hard delete cascades through registrations, passes and complaints, which are
+ * not only the user's data: attendance counts, reports and complaint histories
+ * belong to events and to other people. Deleting the account therefore
+ * anonymises it in place — identifiers are overwritten, sessions and tokens are
+ * destroyed, the row stays as a tombstone so nothing dangles.
+ */
+export async function deleteMyAccount(userId: string, confirmation: string) {
+  const { db } = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new ApiError("NOT_FOUND", "User not found.");
+  if (user.anonymisedAt) throw new ApiError("CONFLICT", "This account was already deleted.");
+  if (confirmation.trim().toLowerCase() !== user.email.toLowerCase())
+    throw new ApiError("VALIDATION_ERROR", "Type your account email exactly to confirm deletion.");
+  const [holdsInstitution] = await db
+    .select({ id: roleAssignments.id })
+    .from(roleAssignments)
+    .where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.role, "ADMIN")))
+    .limit(1);
+  if (holdsInstitution)
+    throw new ApiError(
+      "LAST_ADMIN",
+      "An administrator cannot delete their own account here. Ask another administrator to remove your role first.",
+    );
+
+  const placeholders = {
+    fullName: "Deleted account",
+    email: `deleted+${userId}@invalid.campusops`,
+    phone: null,
+    emailVerifiedAt: null,
+    phoneVerifiedAt: null,
+  };
+  await db.transaction(async (tx) => {
+    await tx.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.userId, userId));
+    await tx
+      .update(authTokens)
+      .set({ consumedAt: new Date() })
+      .where(eq(authTokens.userId, userId));
+    await tx
+      .update(studentProfiles)
+      .set({
+        institutionName: "Deleted account",
+        rollNumber: null,
+        collegeIdNumber: null,
+        program: null,
+        photoFileId: null,
+        idProofFileId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(studentProfiles.userId, userId));
+    await tx.delete(clubMemberships).where(eq(clubMemberships.userId, userId));
+    await tx.delete(roleAssignments).where(eq(roleAssignments.userId, userId));
+    // Complaints keep their reporter link: the issue is still a live operational
+    // record for the event, and the person behind it is already anonymous.
+    await tx
+      .update(users)
+      .set({
+        ...placeholders,
+        // A password nobody holds. Authentication for this row is impossible
+        // even if a future code path forgets to check anonymisedAt.
+        passwordHash: `deleted:${randomUUID()}`,
+        status: "REJECTED",
+        consentAcceptedAt: null,
+        consentVersion: null,
+        anonymisedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  });
+  return { deleted: true };
 }

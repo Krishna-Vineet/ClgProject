@@ -11,6 +11,8 @@ export type ApiErrorCode =
   | "INTERNAL_ERROR"
   | "DATABASE_UNAVAILABLE"
   | "DATABASE_SCHEMA_OUT_OF_DATE"
+  | "DATABASE_CONNECTION_LOST"
+  | "REQUEST_TIMEOUT"
   | "INVALID_CREDENTIALS"
   | "EMAIL_EXISTS"
   | "TOKEN_INVALID"
@@ -43,8 +45,13 @@ const statusByCode: Record<ApiErrorCode, number> = {
   RESOURCE_CONFLICT: 409,
   STALE_APPROVAL_VERSION: 409,
   INTERNAL_ERROR: 500,
+  // 504: the server gave up waiting; the client may retry a read, and a write
+  // that was already checked for idempotency is safe to replay.
+  REQUEST_TIMEOUT: 504,
   DATABASE_UNAVAILABLE: 503,
   DATABASE_SCHEMA_OUT_OF_DATE: 503,
+  // 503, not 500: the request is safe to replay and the client may retry.
+  DATABASE_CONNECTION_LOST: 503,
   INVALID_CREDENTIALS: 401,
   EMAIL_EXISTS: 409,
   TOKEN_INVALID: 400,

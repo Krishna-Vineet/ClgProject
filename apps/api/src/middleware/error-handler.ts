@@ -8,6 +8,7 @@ import {
   pgCode,
   pgDetail,
 } from "../utils/db-error";
+import { hasTransientSocketError } from "../utils/db-retry";
 import { log } from "../utils/logger";
 import { fail } from "../utils/response";
 
@@ -37,6 +38,14 @@ function databaseError(err: unknown): ApiError | null {
     return new ApiError(
       "DATABASE_UNAVAILABLE",
       "The database is briefly unavailable. Retry shortly.",
+    );
+  // A pooled host closed the backend mid-request. It reaches here only after the
+  // retry in utils/db-retry gave up, so say what actually happened rather than
+  // reporting an unexplained 500 — and make the retry advice specific.
+  if (hasTransientSocketError(err))
+    return new ApiError(
+      "DATABASE_CONNECTION_LOST",
+      "The connection to the database dropped while this request was in flight. Nothing was saved twice; please try again.",
     );
   // The code was updated before the database was. That is an operator problem,
   // not an unexplained 500: name the fix so the person running the server can act.

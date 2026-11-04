@@ -20,7 +20,9 @@
   --surface-3: #e7e2d4;
   --ink: #17160f;
   --ink-2: #3a382d;
-  --muted: #726f61;
+  /* 4.99:1 on --paper and 4.39:1 on --surface-3. The old value measured 4.43 on
+     paper and 3.90 on the third surface, so secondary text failed WCAG AA. */
+  --muted: #676454;
   --line: #e0dbcc;
   --line-strong: #cec7b4;
 
@@ -3375,11 +3377,16 @@ p.muted {
   flex-direction: column;
   gap: 2px;
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--paper-on-ink) 58%, transparent);
+  /* 78% keeps the label readable against the accent fill; 58% measured under
+     the 4.5:1 needed for text this small. */
+  color: color-mix(in srgb, var(--paper-on-ink) 82%, transparent);
+}
+.stat-card.accent .stat-split em {
+  font-style: normal;
 }
 .stat-card.accent .stat-split b {
   font-family: var(--font-display);

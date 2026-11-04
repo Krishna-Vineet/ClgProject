@@ -2,7 +2,7 @@
 
 Campus event operations for frequent short events: plan → permissions → resources → publish → register → verify → issues.
 
-**Status:** production hardening. The full flow — permissions, resources, approvals, publication, registration, signed passes, scanning, complaints and reports — runs end to end on one connected codebase. The current round hardens the API (idempotency, maintenance, structured logs, proxy-aware rate limits), turns every create/edit form into a dialog, and adds search, audit, setup guidance and export/calendar links. 360 API tests pass.
+**Status:** production hardening. The full flow — permissions, resources, approvals, publication, registration, signed passes, scanning, complaints and reports — runs end to end on one connected codebase. The current round hardens the API (idempotency, maintenance, structured logs, proxy-aware rate limits), turns every create/edit form into a dialog, and adds search, audit, setup guidance and export/calendar links. 410 API tests pass (`bun run test`; five need the `btree_gist` exclusion constraint and only run on a database that has it).
 
 **Audience split:** the website is management-only. Students (college and outside) use the mobile app; the event’s own coordinators and faculty scan with their normal login; there is no student web portal. An account with no staff role and no club membership is told to use the app.
 
@@ -120,9 +120,9 @@ OpenAPI 3.1 is served at **`GET /api/v1/openapi.json`**, generated from the same
 | Area | Routes |
 |---|---|
 | Meta | `/health/live`, `/health/ready`, `/config`, `/openapi.json` |
-| Auth | `/auth/*`, `/me` |
-| Files | `/files/config`, `/files/presign`, `/files/:id/complete`, `/files/:id/download` |
-| Admin | `/admin/users*`, `/admin/users/:id`, `/admin/staff`, `/admin/jobs`, `/admin/jobs/maintenance` |
+| Auth | `/auth/*`, `/me`, `/me/export`, `/me/delete` |
+| Files | `/files/config`, `/files/presign`, `/files/:id/complete` (magic-byte checked), `/files/:id/download` |
+| Admin | `/admin/users*`, `/admin/users/:id`, `/admin/staff`, `/admin/staff/:id` (PATCH), `/admin/programs`, `/admin/jobs`, `/admin/jobs/maintenance` |
 | Departments | `/departments` (GET/POST), `/departments/:id` (PATCH) |
 | Faculty | `/faculty/verification-queue`, `/faculty/students/*` |
 | Clubs | `/clubs/*`, `/clubs/:id/candidates`, `/clubs/:id/members*`, `/me/clubs` |
@@ -132,6 +132,16 @@ OpenAPI 3.1 is served at **`GET /api/v1/openapi.json`**, generated from the same
 | Reports | `/events/:id/reports` (POST/GET), `/events/:id/report-preview`, `/events/:id/reports/:reportId`, `/events/:id/reports/:reportId/pdf` |
 | Access | `/events/:id/checkpoints` (GET/POST), `/access/checkpoints/:id` (PATCH/DELETE), `/events/:id/passes`, `/events/:id/passes/issue`, `/access/passes/:id/revoke`, `/events/:id/access-log`, `/access/scan`, `/me/passes`, `/me/passes/:id/nonce` |
 | Complaints | `/events/:id/complaint-locations` (GET/POST), `/complaints/locations/:id` (GET/PATCH), `/complaints/locations/:id/poster`, `/complaints/locations/:id/reports`, `/events/:id/complaints`, `/events/:id/complaints/summary`, `/complaints/:id` (GET/PATCH) |
+
+Two routes carry role-scoped access beyond the ADMIN router:
+
+| Route | Admin | HOD/Dean |
+|---|---|---|
+| `GET /admin/staff` | every staff member | own department only (`departmentId` outside the scope → 403) |
+| `GET /admin/programs` | every programme | programmes whose home *or* foundation department is in scope |
+| `PATCH /admin/staff/:id` | any field, including department, designation, position and employee code | name, phone, email only; structural keys → 400, another department's member → 403 |
+
+`GET /me/export` returns everything held about the caller (including which consent-policy version they accepted). `POST /me/delete` anonymises the account in place: identifiers are overwritten and sessions destroyed, while attendance and complaint history stay readable because other people's records depend on them.
 
 ### Post-event reports
 

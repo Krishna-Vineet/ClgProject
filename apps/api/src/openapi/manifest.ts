@@ -175,6 +175,25 @@ export const operations: Operation[] = [
     summary: "Current user, profile, roles and club memberships",
     auth: true,
   },
+  {
+    method: "get",
+    path: "/me/export",
+    tag: "Auth",
+    summary: "Download everything the institution holds about you",
+    description:
+      "JSON attachment containing the account, consent record and policy version, profile, roles, registrations, passes and complaints you reported.",
+    auth: true,
+  },
+  {
+    method: "post",
+    path: "/me/delete",
+    tag: "Auth",
+    summary: "Delete your account (anonymised in place)",
+    description:
+      "Identifiers are overwritten and sessions destroyed. Event, attendance and complaint history stay, with no link back to you. Typing the account email is the deliberate-action check.",
+    auth: true,
+    body: authSchemas.deleteAccountSchema,
+  },
 
   // ── Files ───────────────────────────────────────────────────────────────
   {
@@ -274,10 +293,31 @@ export const operations: Operation[] = [
     method: "get",
     path: "/admin/staff",
     tag: "Admin",
-    summary: "Staff directory with department and position filters",
+    summary: "Staff directory, scoped to the caller's department for an HOD/Dean",
     auth: true,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "HOD_DEAN"],
     query: adminSchemas.listStaffSchema,
+    description:
+      "Admin sees the institution. An HOD/Dean sees only staff in departments they hold a scoped role for; asking for another department returns 403 rather than another department's data.",
+  },
+  {
+    method: "patch",
+    path: "/admin/staff/:id",
+    tag: "Admin",
+    summary: "Edit a staff member's details",
+    auth: true,
+    roles: ["ADMIN", "HOD_DEAN"],
+    body: adminSchemas.updateStaffSchema,
+    description:
+      "Admin may change name, phone, email, department, designation, position and employee code. An HOD/Dean may change name, phone and email for staff in their own department only. Changing an email clears verification, moves an ACTIVE account to PENDING_EMAIL and revokes its sessions.",
+  },
+  {
+    method: "get",
+    path: "/admin/programs",
+    tag: "Admin",
+    summary: "Programmes the caller may administer, already narrowed to their scope",
+    auth: true,
+    roles: ["ADMIN", "HOD_DEAN"],
   },
   {
     method: "post",

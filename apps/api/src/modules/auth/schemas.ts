@@ -87,3 +87,8 @@ export const updateMeSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required.",
   });
+
+export const deleteAccountSchema = z.object({
+  // Typing the address is the deliberate-action check; there is no undo.
+  confirmEmail: emailSchema,
+});

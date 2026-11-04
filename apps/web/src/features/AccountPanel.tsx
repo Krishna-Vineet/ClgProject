@@ -2,8 +2,8 @@ import { GLOBAL_ROLE_LABELS } from "@campusops/shared/ui";
 import { useState } from "react";
 import { ConfirmDialog, useAction } from "../components/feedback";
 import { Icon } from "../components/icons";
-import { Card, Empty, Field } from "../components/ui";
-import { api } from "../lib/api";
+import { Card, Empty, Field, SuccessNote } from "../components/ui";
+import { api, downloadBlob } from "../lib/api";
 import { useSession } from "../lib/session";
 
 /** Profile, roles and session security for the signed-in staff member. */
@@ -12,6 +12,10 @@ export function AccountPanel() {
   const action = useAction();
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirm: "" });
   const [confirmAll, setConfirmAll] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!me) return null;
 
@@ -180,6 +184,74 @@ export function AccountPanel() {
         </Card>
 
         <div className="stack">
+          <Card
+            title="Your data"
+            subtitle="What this institution holds about you, and how to take it with you."
+          >
+            <p className="meta">
+              The export is a JSON file: your account, which consent-policy version you accepted,
+              your profile, roles, registrations, passes and the issues you reported.
+            </p>
+            <div className="row">
+              <button
+                type="button"
+                className="ghost"
+                onClick={async () => {
+                  setExportNotice(null);
+                  await downloadBlob("/me/export", "campusops-account.json");
+                  setExportNotice("Downloaded campusops-account.json.");
+                }}
+              >
+                <Icon name="download" size={14} /> Download my data
+              </button>
+            </div>
+            <SuccessNote message={exportNotice} />
+            <hr />
+            <p className="meta">
+              Deleting your account overwrites your name, email, phone and ID numbers and ends every
+              session. Your event and issue history stays with the event, with no link back to you —
+              other people's records depend on it.
+            </p>
+            {deleteError && (
+              <p className="bad-note" role="alert">
+                <Icon name="alert" size={15} /> <span>{deleteError}</span>
+              </p>
+            )}
+            <Field label="Type your email to confirm deletion" hint={me.user.email}>
+              <input
+                type="text"
+                autoComplete="off"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder={me.user.email}
+              />
+            </Field>
+            <button
+              type="button"
+              className="danger"
+              disabled={
+                deleting || deleteConfirm.trim().toLowerCase() !== me.user.email.toLowerCase()
+              }
+              onClick={async () => {
+                setDeleteError(null);
+                setDeleting(true);
+                try {
+                  await api("/me/delete", { confirmEmail: deleteConfirm.trim() });
+                  // The account is gone; drop the local session rather than sit on
+                  // a screen whose next request would 401.
+                  await signOut(false);
+                } catch (err) {
+                  setDeleteError(
+                    err instanceof Error ? err.message : "Could not delete the account.",
+                  );
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete my account"}
+            </button>
+          </Card>
           <Card title="Sessions">
             <div className="row">
               <button type="button" className="ghost" onClick={() => signOut(false)}>

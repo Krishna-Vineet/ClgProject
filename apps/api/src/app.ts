@@ -8,8 +8,9 @@ import { errorHandler } from "./middleware/error-handler";
 import { idempotent } from "./middleware/idempotency";
 import { opportunisticMaintenance } from "./middleware/maintenance";
 import { requestId } from "./middleware/request-id";
+import { requestTimeout } from "./middleware/request-timeout";
 import { accessRoutes, eventAccessRoutes, myPassRoutes } from "./modules/access/routes";
-import { adminRoutes } from "./modules/admin/routes";
+import { adminRoutes, staffDirectoryRoutes } from "./modules/admin/routes";
 import {
   announcementRoutes,
   eventAnnouncementRoutes,
@@ -46,6 +47,8 @@ export function createApp() {
   app.use("*", requestId);
   app.use("*", secureHeaders());
   app.use("*", bodyLimit({ maxSize: 1024 * 1024 }));
+  // A stuck statement must not be able to occupy a pool slot forever.
+  app.use("*", requestTimeout());
   app.use("*", async (c, next) => {
     const started = performance.now();
     await next();
@@ -66,6 +69,14 @@ export function createApp() {
     cors({
       origin: [env.WEB_ORIGIN],
       allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id"],
+      // So a browser client can read the replay marker and the rate-limit counters.
+      exposeHeaders: [
+        "X-Request-Id",
+        "X-Response-Time",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "Idempotent-Replay",
+      ],
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
       maxAge: 600,
@@ -104,6 +115,9 @@ export function createApp() {
   app.route("/api/v1/me/devices", myDeviceRoutes);
   app.route("/api/v1/me", meRoutes);
   app.route("/api/v1/faculty", facultyRoutes);
+  // The department-scoped staff directory is mounted FIRST: it accepts an HOD/Dean,
+  // while the router below it requires the ADMIN role for every route.
+  app.route("/api/v1/admin", staffDirectoryRoutes);
   app.route("/api/v1/admin", adminRoutes);
   app.route("/api/v1/departments", departmentRoutes);
   app.route("/api/v1/clubs", clubRoutes);

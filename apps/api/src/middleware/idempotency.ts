@@ -64,6 +64,10 @@ export function idempotent(scope: string) {
       if (existing.completed) {
         if (existing.responseStatus === null || existing.responseBody === null)
           throw new ApiError("IDEMPOTENCY_IN_PROGRESS", "This request is still being processed.");
+        // Tell the caller this is a replay. Without the header a client that
+        // retried after a timeout cannot tell "my write landed" from "here is a
+        // brand-new object", and the body carries the original request's id.
+        c.header("Idempotent-Replay", "true");
         return c.json(existing.responseBody, existing.responseStatus as 200);
       }
 
@@ -109,6 +113,8 @@ export function idempotent(scope: string) {
 
     const res = c.res;
     if (res.status >= 500) {
+      // A 5xx may have half-applied the request; the key is released so the
+      // client's retry actually runs rather than replaying a failure forever.
       await db
         .delete(idempotencyKeys)
         .where(and(eq(idempotencyKeys.key, key), eq(idempotencyKeys.scope, fullScope)));

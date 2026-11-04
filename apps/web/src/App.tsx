@@ -58,6 +58,7 @@ type Config = {
   emailMode: string | null;
   exposeDemoOtp: boolean;
   storageMode: string;
+  institutionName?: string;
 };
 type Tab =
   | "dashboard"
@@ -311,7 +312,9 @@ function Shell() {
     if (isAdmin || isSenior) list.push("students");
     list.push("resources");
     if (isClubMember || isStaff) list.push("clubs", "reports");
-    if (isAdmin) list.push("admin", "audit");
+    // An HOD/Dean opens Administration for their own department; the API scopes it.
+    if (isAdmin || isSenior) list.push("admin");
+    if (isAdmin) list.push("audit");
     list.push("account");
     return list;
   }, [isClubMember, isStaff, isFaculty, isSenior, isAdmin]);
@@ -475,7 +478,7 @@ function Shell() {
               CampusOps · <b>Event operations</b>
             </span>
             <span>
-              Made by <b>Vineet</b>
+              For <b>{config?.institutionName ?? "your institution"}</b>
             </span>
           </div>
         </aside>
@@ -765,10 +768,12 @@ function Shell() {
             </button>
           </div>
           <div className="sidebar-credit">
+            {/* The institution this deployment belongs to, not the developer's
+                name: a signed-in staff member is looking at their college. */}
             <span>CampusOps</span>
-            <b>
+            <b title="Institution">
               <span className="credit-dot" />
-              Made by Vineet
+              {config?.institutionName ?? "Institution"}
             </b>
           </div>
         </div>
@@ -1105,7 +1110,7 @@ function Shell() {
                 {active === "resources" && <ResourcesPanel />}
                 {active === "clubs" && (isClubMember || isStaff) && <ClubsPanel />}
                 {active === "reports" && (isClubMember || isStaff) && <ReportsPanel />}
-                {active === "admin" && isAdmin && <AdminPanel />}
+                {active === "admin" && (isAdmin || isSenior) && <AdminPanel />}
                 {active === "audit" && isAdmin && <AuditPanel />}
                 {active === "account" && <AccountPanel />}
               </Suspense>

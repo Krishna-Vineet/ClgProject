@@ -2,7 +2,7 @@ import { type Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { env } from "../../config/env";
 import { authenticate } from "../../middleware/auth";
-import { rateLimit } from "../../middleware/rate-limit";
+import { clientIp, rateLimit } from "../../middleware/rate-limit";
 import { parseJson } from "../../middleware/validate";
 import { ApiError } from "../../utils/api-error";
 import { ok } from "../../utils/response";
@@ -12,9 +12,15 @@ import * as service from "./service";
 
 const REFRESH_COOKIE = "campusops_refresh";
 
+/**
+ * Session metadata. The address comes from `clientIp`, the same trusted-hop
+ * resolution the rate limiter uses: reading the left-most X-Forwarded-For entry
+ * here let any client choose the address stored in `sessions.ip_hash`, because
+ * the left edge of that header is whatever the caller sent.
+ */
 function clientMeta(c: Context) {
   return {
-    ip: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("x-real-ip"),
+    ip: clientIp(c),
     userAgent: c.req.header("user-agent"),
   };
 }
@@ -74,17 +80,21 @@ authRoutes.post(
   },
 );
 
-authRoutes.post("/verify-email", async (c) => {
-  const input = await parseJson(c, schemas.verifyEmailSchema);
-  const result = await service.verifyEmail(input);
-  await writeAudit(c, {
-    action: "AUTH_EMAIL_VERIFIED",
-    entityType: "user",
-    entityId: result.user.id,
-    after: { status: result.user.status },
-  });
-  return ok(c, result);
-});
+authRoutes.post(
+  "/verify-email",
+  rateLimit({ windowMs: 60_000, max: 10, prefix: "verify-email" }),
+  async (c) => {
+    const input = await parseJson(c, schemas.verifyEmailSchema);
+    const result = await service.verifyEmail(input);
+    await writeAudit(c, {
+      action: "AUTH_EMAIL_VERIFIED",
+      entityType: "user",
+      entityId: result.user.id,
+      after: { status: result.user.status },
+    });
+    return ok(c, result);
+  },
+);
 
 authRoutes.post(
   "/resend-verification",
@@ -161,12 +171,18 @@ authRoutes.post(
   },
 );
 
-authRoutes.post("/reset-password", async (c) => {
-  const input = await parseJson(c, schemas.resetPasswordSchema);
-  const result = await service.resetPassword(input);
-  await writeAudit(c, { action: "AUTH_PASSWORD_RESET", entityType: "user" });
-  return ok(c, result);
-});
+// Code guessing is the attack here, so the endpoint is throttled like sign-in.
+// It used to be unthrottled, which made a 6-digit OTP effectively guessable.
+authRoutes.post(
+  "/reset-password",
+  rateLimit({ windowMs: 60_000, max: 10, prefix: "reset-password" }),
+  async (c) => {
+    const input = await parseJson(c, schemas.resetPasswordSchema);
+    const result = await service.resetPassword(input);
+    await writeAudit(c, { action: "AUTH_PASSWORD_RESET", entityType: "user" });
+    return ok(c, result);
+  },
+);
 
 authRoutes.post("/change-password", authenticate, async (c) => {
   const input = await parseJson(c, schemas.changePasswordSchema);
@@ -188,4 +204,25 @@ meRoutes.get("/", async (c) => ok(c, await service.getMe(c.get("auth").user.id))
 meRoutes.patch("/", async (c) => {
   const input = await parseJson(c, schemas.updateMeSchema);
   return ok(c, await service.updateMe(c.get("auth").user.id, input));
+});
+
+/** Everything held about the caller, as a JSON download. */
+meRoutes.get("/export", async (c) => {
+  const data = await service.exportMyData(c.get("auth").user.id);
+  c.header("Content-Disposition", 'attachment; filename="campusops-account.json"');
+  return ok(c, data);
+});
+
+/** The right to be forgotten, exercised from the account screen. */
+meRoutes.post("/delete", async (c) => {
+  const input = await parseJson(c, schemas.deleteAccountSchema);
+  const auth = c.get("auth");
+  const result = await service.deleteMyAccount(auth.user.id, input.confirmEmail);
+  deleteCookie(c, REFRESH_COOKIE, { path: "/api/v1/auth" });
+  await writeAudit(c, {
+    action: "AUTH_ACCOUNT_DELETED",
+    entityType: "user",
+    entityId: auth.user.id,
+  });
+  return ok(c, result);
 });

@@ -46,7 +46,14 @@ const envSchema = z
     // Apply pending SQL migrations before the server starts. On by default for
     // local development; production runs migrations as an explicit deploy step
     // (or sets AUTO_MIGRATE=true when it has a direct, non-pooled connection).
+    // Explicitly denied by default in production: a web process that migrates on
+    // boot will happily race a rolling deploy, and a schema change should be a
+    // deliberate step, not a side effect of the service restarting.
     AUTO_MIGRATE: boolFromEnv(process.env.NODE_ENV !== "production"),
+    // Nothing used to bound how long a request could occupy a connection. A
+    // statement that waits on a lock forever turns one bad deploy into a full
+    // outage, because the pool drains and every later request queues behind it.
+    REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
     // Reserved for a future Neon Auth integration. CampusOps currently uses its own auth.
     NEON_AUTH_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 

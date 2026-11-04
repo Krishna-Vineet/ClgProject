@@ -2,15 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import { FormDialog, useAction, useToast } from "../components/feedback";
 import { Card, Empty, Field } from "../components/ui";
 import { api, errorMessage } from "../lib/api";
+import { useSession } from "../lib/session";
 import { StaffPanel } from "./StaffPanel";
 
 type Department = { id: string; code: string; name: string };
 type Sub = "staff" | "departments";
 
 export function AdminPanel() {
+  const session = useSession();
   const [sub, setSub] = useState<Sub>("staff");
   return (
     <div className="stack">
+      {!session.isAdmin && (
+        <p className="note">
+          Showing administration for your department only. Staff, contact details and programmes
+          outside it are not visible here; department structure stays with the administrator.
+        </p>
+      )}
       <div className="subtabs">
         {(
           [
@@ -84,18 +92,27 @@ function DepartmentsSection() {
   const [deptOpen, setDeptOpen] = useState(false);
   const [programDraft, setProgramDraft] = useState<ProgramDraft | null>(null);
 
+  const session = useSession();
   const load = useCallback(async () => {
     try {
+      // An HOD/Dean gets their own department's programmes from the scoped
+      // endpoint. The institution-wide list is Admin-only and would 403.
       const [departmentResult, programResult] = await Promise.all([
         api<{ items: Department[] }>("/departments"),
-        api<{ items: Program[] }>("/departments/programs?includeInactive=true"),
+        session.isAdmin
+          ? api<{ items: Program[] }>("/departments/programs?includeInactive=true")
+          : api<{ items: Program[] }>("/admin/programs"),
       ]);
-      setItems(departmentResult.items);
+      setItems(
+        session.isAdmin
+          ? departmentResult.items
+          : departmentResult.items.filter((d) => session.scopedDepartmentIds.includes(d.id)),
+      );
       setPrograms(programResult.items);
     } catch (err) {
       toast.err(errorMessage(err));
     }
-  }, [toast]);
+  }, [toast, session.isAdmin, session.scopedDepartmentIds]);
 
   useEffect(() => {
     load();
@@ -157,9 +174,11 @@ function DepartmentsSection() {
       <Card
         title="Departments"
         actions={
-          <button type="button" onClick={() => setDeptOpen(true)}>
-            New department
-          </button>
+          session.isAdmin ? (
+            <button type="button" onClick={() => setDeptOpen(true)}>
+              New department
+            </button>
+          ) : null
         }
       >
         <p className="meta">
@@ -179,22 +198,24 @@ function DepartmentsSection() {
                     <code className="badge">{department.code}</code>
                     <strong>{department.name}</strong>
                   </div>
-                  <div className="row">
-                    <button
-                      type="button"
-                      className="ghost tiny"
-                      onClick={() => setRenaming({ id: department.id, name: department.name })}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost tiny"
-                      onClick={() => setProgramDraft(emptyProgram(department.id))}
-                    >
-                      Add programme
-                    </button>
-                  </div>
+                  {session.isAdmin && (
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="ghost tiny"
+                        onClick={() => setRenaming({ id: department.id, name: department.name })}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost tiny"
+                        onClick={() => setProgramDraft(emptyProgram(department.id))}
+                      >
+                        Add programme
+                      </button>
+                    </div>
+                  )}
                 </header>
                 {list.length === 0 ? (
                   <p className="hint">No programmes assigned to this department yet.</p>

@@ -22,7 +22,8 @@ export const colors = {
   cardAlt: "#f0ece1",
   ink: "#17160f",
   inkSoft: "#3a382d",
-  muted: "#726f61",
+  // 4.99:1 on the paper background (was #726f61 at 4.43:1, below AA).
+  muted: "#676454",
   line: "#e0dbcc",
   lineStrong: "#cec7b4",
   primary: "#b0472b",
@@ -247,6 +248,43 @@ export function Chip({
       <Text style={[s.chipText, selected && { color: colors.cream }]} numberOfLines={1}>
         {label}
       </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * A real checkbox: role="checkbox", a hit target large enough to tap, and the
+ * label inside the pressable so the text is part of the control.
+ */
+export function Checkbox({
+  checked,
+  onToggle,
+  label,
+  hint,
+  testID,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
+  hint?: string;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel={label}
+      onPress={onToggle}
+      testID={testID}
+      style={({ pressed }) => [s.checkbox, pressed && { opacity: 0.8 }]}
+    >
+      <View style={[s.checkboxBox, checked && s.checkboxBoxOn]}>
+        {checked ? <Text style={s.checkboxTick}>✓</Text> : null}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.checkboxLabel}>{label}</Text>
+        {hint ? <Text style={s.checkboxHint}>{hint}</Text> : null}
+      </View>
     </Pressable>
   );
 }
@@ -527,4 +565,25 @@ const s = StyleSheet.create({
     textAlign: "right",
   },
   divider: { height: 1, backgroundColor: colors.line },
+  checkbox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 8,
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxBoxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxTick: { color: colors.cream, fontSize: 14, lineHeight: 18, fontWeight: "700" },
+  checkboxLabel: { color: colors.ink, fontSize: 13, lineHeight: 19 },
+  checkboxHint: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 3 },
 });

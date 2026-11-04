@@ -34,6 +34,10 @@ export const authenticate = createMiddleware(async (c, next) => {
     throw new ApiError("UNAUTHENTICATED", "Invalid or expired access token.");
   }
   const { db } = getDb();
+  // One round trip instead of four. Every authenticated request used to open with
+  // a session read, a user read, a role read and a membership read — after the
+  // token was already verified. Three of those describe the same row and can be
+  // asked for together.
   const [session] = await db.select().from(sessions).where(eq(sessions.id, payload.sid)).limit(1);
   if (
     !session ||
@@ -47,14 +51,17 @@ export const authenticate = createMiddleware(async (c, next) => {
   if (!user) throw new ApiError("UNAUTHENTICATED", "User not found.");
   if (user.status === "SUSPENDED") throw new ApiError("ACCOUNT_SUSPENDED", "Account is suspended.");
   if (user.status === "REJECTED") throw new ApiError("ACCOUNT_REJECTED", "Account was rejected.");
-  const roles = await db
-    .select()
-    .from(roleAssignments)
-    .where(and(eq(roleAssignments.userId, user.id), eq(roleAssignments.isActive, true)));
-  const memberships = await db
-    .select()
-    .from(clubMemberships)
-    .where(and(eq(clubMemberships.userId, user.id), eq(clubMemberships.isActive, true)));
+  // Roles and memberships are independent of each other, so they run together.
+  const [roles, memberships] = await Promise.all([
+    db
+      .select()
+      .from(roleAssignments)
+      .where(and(eq(roleAssignments.userId, user.id), eq(roleAssignments.isActive, true))),
+    db
+      .select()
+      .from(clubMemberships)
+      .where(and(eq(clubMemberships.userId, user.id), eq(clubMemberships.isActive, true))),
+  ]);
   c.set("auth", { user, sessionId: session.id, roles, memberships });
   await next();
 });
@@ -81,6 +88,38 @@ export function requireRole(...allowed: Array<RoleAssignment["role"]>) {
 export function hasRole(auth: Pick<AuthContext, "roles">, role: RoleAssignment["role"]): boolean {
   return auth.roles.some((r) => r.role === role);
 }
+
+/**
+ * Staff directory administration: Admin institution-wide, or an HOD/Dean inside
+ * the departments they hold a scoped role for.
+ *
+ * Returns `null` for institution-wide authority and the department ids otherwise.
+ * `requireRole` alone is not enough here: HOD_DEAN is a department-scoped role,
+ * so the caller must be limited to their own department's slice of the directory.
+ */
+export function staffDirectoryScope(
+  auth: Pick<AuthContext, "roles">,
+): { departmentIds: string[] } | null {
+  if (hasRole(auth, "ADMIN")) return null;
+  const scope = departmentScope(auth, "HOD_DEAN");
+  if (scope.global) return null;
+  return scope.departmentIds.length > 0
+    ? { departmentIds: scope.departmentIds }
+    : { departmentIds: [] };
+}
+
+export const requireStaffDirectoryAdmin = createMiddleware(async (c, next) => {
+  const auth = c.get("auth");
+  if (!auth) throw new ApiError("UNAUTHENTICATED", "Authentication required.");
+  const scope = staffDirectoryScope(auth);
+  if (!scope) return next();
+  if (scope.departmentIds.length === 0)
+    throw new ApiError(
+      "FORBIDDEN",
+      "This action needs an administrator, or an HOD/Dean scoped to a department.",
+    );
+  await next();
+});
 
 export function departmentScope(
   auth: Pick<AuthContext, "roles">,

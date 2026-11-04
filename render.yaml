@@ -9,7 +9,10 @@ services:
     rootDir: .
     buildCommand: bun install --frozen-lockfile
     startCommand: bun run apps/api/src/index.ts
-    healthCheckPath: /health/live
+    # /health/live only proves the process is up, so Render would keep routing
+    # traffic to an instance whose database or schema is unusable. /health/ready
+    # checks the table the app actually needs and answers 503 when it cannot serve.
+    healthCheckPath: /health/ready
     envVars:
       - key: BUN_VERSION
         value: 1.4.4
@@ -17,6 +20,12 @@ services:
         value: production
       - key: PORT
         value: 8787
+      # Migrations are an explicit deploy step, not a boot side effect. Run
+      # `bun run db:migrate` once against DATABASE_DIRECT_URL before deploying.
+      - key: AUTO_MIGRATE
+        value: "false"
+      - key: REQUEST_TIMEOUT_MS
+        value: 20000
       - key: JOBS_ENABLED
         value: "false"
       - key: RATE_LIMIT_SCALE

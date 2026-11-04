@@ -197,6 +197,14 @@ export const users = pgTable(
     phone: text("phone"),
     phoneVerifiedAt: tz("phone_verified_at"),
     consentAcceptedAt: tz("consent_accepted_at"),
+    /** Version of the policy the user accepted; null for rows captured before versioning. */
+    consentVersion: text("consent_version"),
+    /**
+     * Set when the person asked to be forgotten. The row stays because the
+     * institution's event history references it; every identifying field is
+     * overwritten in the same transaction.
+     */
+    anonymisedAt: tz("anonymised_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     lastLoginAt: tz("last_login_at"),
@@ -305,6 +313,11 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     refreshTokenHash: text("refresh_token_hash").notNull().unique(),
+    /**
+     * One sign-in chain: login creates the id, every rotation carries it forward.
+     * Reuse detection revokes a family, never the user's other devices.
+     */
+    familyId: uuid("family_id").notNull(),
     deviceLabel: text("device_label"),
     ipHash: text("ip_hash"),
     userAgent: text("user_agent"),
@@ -312,7 +325,7 @@ export const sessions = pgTable(
     revokedAt: tz("revoked_at"),
     createdAt: createdAt(),
   },
-  (t) => [index("sessions_user_idx").on(t.userId)],
+  (t) => [index("sessions_user_idx").on(t.userId), index("sessions_family_idx").on(t.familyId)],
 );
 
 export const authTokens = pgTable(

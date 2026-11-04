@@ -1,0 +1,37 @@
+{
+  "name": "campusops",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "bun --filter @campusops/api dev",
+    "dev:web": "bun --filter @campusops/web dev",
+    "dev:mobile": "bun --filter @campusops/mobile dev",
+    "db:migrate": "bun --filter @campusops/api db:migrate",
+    "db:seed": "bun --filter @campusops/api db:seed",
+    "db:check": "bun --filter @campusops/api db:check",
+    "test": "bun --filter @campusops/api test",
+    "typecheck": "bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck && bun run --filter @campusops/mobile typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "build:web": "bun --filter @campusops/web build",
+    "jobs:run": "bun --filter @campusops/api jobs:run",
+    "e2e": "bun run e2e/portal.mjs",
+    "e2e:management": "bun run e2e/management.mjs",
+    "e2e:all": "bun run e2e/dashboard.mjs && bun run e2e/access-complaints.mjs && bun run e2e/portal.mjs && bun run e2e/management.mjs && bun run e2e/phase7.mjs",
+    "e2e:access": "bun run e2e/access-complaints.mjs",
+    "e2e:mobile": "bun run e2e/mobile.mjs",
+    "build:mobile:web": "bun --filter @campusops/mobile build:web",
+    "preview:mobile": "bun --no-env-file --env-file=.env.web run apps/mobile/serve-preview.mjs",
+    "e2e:dashboard": "bun run e2e/dashboard.mjs",
+    "admin:bootstrap": "bun --filter @campusops/api admin:bootstrap",
+    "check": "bun run lint && bun run typecheck",
+    "e2e:phase7": "bun run e2e/phase7.mjs",
+    "start:api": "bun --filter @campusops/api start"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "playwright": "1.64.1",
+    "typescript": "^5.7.3"
+  },
+  "trustedDependencies": ["@biomejs/biome"]
+}

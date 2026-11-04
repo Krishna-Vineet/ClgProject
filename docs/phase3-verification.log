@@ -1,0 +1,120 @@
+=== CampusOps Phase 3 verification ===
+Fri Oct 30 06:34:56 UTC 2026
+
+--- toolchain ---
+bun 1.4.4
+psql (PostgreSQL) 17.11 (Debian 17.11-0+deb13u1)
+
+--- lint (biome) ---
+$ biome check .
+Checked 114 files in 262ms. No fixes applied.
+
+--- typecheck (shared, api, web) ---
+$ bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+--- unit + integration tests (real PostgreSQL 17, campusops_test) ---
+@campusops/api test:  105 pass
+@campusops/api test:  0 fail
+@campusops/api test:  640 expect() calls
+@campusops/api test: Ran 105 tests across 12 files. [12.13s]
+@campusops/api test: Exited with code 0
+
+--- per-file breakdown ---
+tests/health.test.ts:
+tests/roles.test.ts:
+tests/env.test.ts:
+tests/web-contract.test.ts:
+tests/contract.test.ts:
+tests/phase2.integration.test.ts:
+tests/constraints.integration.test.ts:
+tests/phase3.integration.test.ts:
+tests/domain.test.ts:
+tests/phase2-hardening.test.ts:
+tests/db.integration.test.ts:
+tests/openapi.test.ts:
+ 105 pass
+ 0 fail
+Ran 105 tests across 12 files. [12.35s]
+
+--- web production build ---
+@campusops/web build: computing gzip size...
+@campusops/web build: dist/index.html                   0.41 kB │ gzip:   0.28 kB
+@campusops/web build: dist/assets/index-CJI4OSd6.css    3.86 kB │ gzip:   1.33 kB
+@campusops/web build: dist/assets/index-B142PGHT.js   451.67 kB │ gzip: 124.30 kB
+@campusops/web build: ✓ built in 2.25s
+@campusops/web build: Exited with code 0
+
+--- real-browser walkthrough (Chromium, live API + PostgreSQL) ---
+PASS  coordinator login — tabs: My events, Resources, Account
+PASS  coordinator sees club events — 13 rows
+PASS  draft created through the UI
+PASS  faculty approver picker is populated — Demo Faculty CSE, Demo Faculty ECE
+PASS  only free units are offered for the event window — 4 available
+PASS  submission creates separate approval requests — 2 individual requests
+PASS  each request carries its own status — PENDING, PENDING
+PASS  publish blocked while required approvals are pending
+PASS  resource availability grid renders — 4 units
+PASS  faculty approval inbox — 9 pending
+PASS  request detail shows history — 1 actions
+PASS  faculty can escalate to HOD/Dean
+PASS  escalation submitted from the browser
+PASS  faculty approved a permission from the browser
+PASS  escalated request reached the HOD/Dean queue — tier HOD/Dean
+PASS  escalation preserved the faculty-tier history
+PASS  HOD/Dean can escalate one more tier to Admin
+PASS  HOD/Dean approved the escalated permission
+PASS  bundle now shows both permissions approved — APPROVED, APPROVED
+PASS  event published once every required approval was granted
+PASS  student sees no coordinator or approval tooling — Resources, Account
+
+No browser console/page errors.
+
+21 passed, 0 failed
+
+--- live API surface ---
+{"data":{"status":"ok","service":"campusops-api","phase":3,"timestamp":"2026-10-30T06:35:51.438Z","checks":{"database":"ok"}},"requestId":"54dcb8d3-e097-4ba4-a833-8b74b29fb49b"}
+OpenAPI 3.1.0 | 69 paths | 79 operations
+unknown route returns 404
+
+--- fresh database: migrate + invariants ---
+@campusops/api db:check:   "publicTables": 45,
+@campusops/api db:check:     "0004_phase3_events_approvals_resources.sql"
+@campusops/api db:check:     "resource_reservations_resource_unit_id_tstzrange_excl"
+@campusops/api db:check:     "approval_bundles_one_current_per_event",
+@campusops/api db:check:     "approval_requests_one_organize_per_bundle",
+@campusops/api db:check:     "approval_requests_one_outsider_per_bundle",
+@campusops/api db:check:     "reservations_hold_expiry_idx"
+@campusops/api db:check:     "audit_logs_no_delete",
+@campusops/api db:check:     "audit_logs_no_update"
+@campusops/api db:check:       "status": "CONFIRMED",
+@campusops/api db:check:       "status": "HELD",
+
+=== Final re-verification after label/a11y and gitignore fixes ===
+Fri Oct 30 06:39:49 UTC 2026
+
+--- lint ---
+$ biome check .
+Checked 114 files in 294ms. No fixes applied.
+
+--- typecheck ---
+$ bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+--- tests ---
+@campusops/api test:  105 pass
+@campusops/api test:  0 fail
+@campusops/api test:  640 expect() calls
+@campusops/api test: Ran 105 tests across 12 files. [11.65s]
+@campusops/api test: Exited with code 0
+
+--- browser walkthrough ---
+PASS  student sees no coordinator or approval tooling — Resources, Account
+
+No browser console/page errors.
+
+21 passed, 0 failed

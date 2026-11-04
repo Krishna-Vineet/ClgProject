@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="CampusOps is the operations desk for campus events: separate permissions, conflict-free rooms, signed entry passes and immutable post-event records."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f0e8" />
+    <meta property="og:title" content="CampusOps · Event operations" />
+    <meta
+      property="og:description"
+      content="Plan, approve, run and record every campus event from one calm console."
+    />
+    <meta property="og:type" content="website" />
+    <!-- The mark, inlined so it paints with the first byte and survives offline previews. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2317160f'/%3E%3Cpath d='M8 10h16v3.6a2.4 2.4 0 0 0 0 4.8V22H8v-3.6a2.4 2.4 0 0 0 0-4.8V10Z' fill='none' stroke='%23f6f1e5' stroke-width='1.9' stroke-linejoin='round'/%3E%3Cpath d='m12 16 2.6 2.6L20 13' fill='none' stroke='%23f6f1e5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='23.2' cy='16' r='1.5' fill='%23e07a52'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;550;600;650;700&display=swap"
+    />
+    <title>CampusOps · Event operations</title>
+    <style>
+      /* Paint the paper before the bundle arrives, so the first frame is not white. */
+      html {
+        background: #f3f0e8;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background: #121210;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p style="font-family: system-ui; padding: 32px; max-width: 52ch">
+        CampusOps needs JavaScript for the management console. Students can use the mobile app
+        instead.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

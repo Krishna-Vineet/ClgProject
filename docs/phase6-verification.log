@@ -1,0 +1,59 @@
+CampusOps Phase 6 verification — 2026-11-01T15:10:17Z
+
+== lint ==
+Checked 177 files in 458ms. No fixes applied.
+
+== typecheck ==
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+@campusops/mobile typecheck: Exited with code 0
+
+== api tests ==
+@campusops/api test:  260 pass
+@campusops/api test:  0 fail
+@campusops/api test: Ran 260 tests across 20 files. [23.36s]
+
+== CI simulation on a fresh database (campusops_ci_sim) ==
+@campusops/api test:  260 pass
+@campusops/api test:  0 fail
+@campusops/api test: Ran 260 tests across 20 files. [24.02s]
+
+== web build reproducibility ==
+86f4edbf086cb01fb428526fbc0069f36f5c0fa3c559bd13f7f99281dd75294e  apps/web/dist/assets/index-DzDgICpF.js
+identical on second build
+
+== dashboard e2e (re-run after the screenshot-timing fix) ==
+9 pass, 0 fail; console/page errors: 0
+Responsive screenshots recaptured at 390 px and 768 px after the drawer transition settles.
+
+== web e2e (access / portal / management) ==
+No browser console/page errors.
+25 passed, 0 failed
+No browser console/page errors.
+32 passed, 0 failed
+No browser console/page errors.
+39 passed, 0 failed
+
+== mobile e2e ==
+
+12 pass, 0 fail; console/page errors: 0
+
+== db check ==
+@campusops/api db:check:       "status": "RELEASED",
+@campusops/api db:check:       "count": 2
+@campusops/api db:check:     }
+@campusops/api db:check:   ]
+@campusops/api db:check: }
+@campusops/api db:check: Exited with code 0
+
+== openapi ==
+version 0.6.0 paths 101 ops 118
+
+== deployment config schema validation ==
+render.yaml errors: 0
+vercel.json errors: 0
+
+== admin bootstrap on an empty database ==
+Bootstrap complete: principal@example.edu is now the institution Admin.
+Second run: Bootstrap refused: An ADMIN role already exists.

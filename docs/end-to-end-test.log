@@ -1,0 +1,1104 @@
+CampusOps end-to-end scenario — 2026-11-04T05:50:18Z
+
+Environment
+  API:      http://127.0.0.1:8787
+  Database: postgresql://campusops@127.0.0.1:55432/campusops_dev (schema dropped and rebuilt)
+  Data:     created exclusively through the product API (no SQL inserts, no seed)
+
+Automated gates
+  bun run lint      : 204 files checked, 0 issues
+  bun run typecheck : shared, api, web and mobile all pass
+  bun run test      : 360 pass / 0 fail (27 files)
+
+Scenario results
+  SETUP COMPLETE
+  STEP 2 COMPLETE
+  STEP 3 COMPLETE: five drafts submitted, each permission as its own request
+  STEP 4 COMPLETE: approvals (incl. rejection, escalation to HOD and Admin) and publishing
+  STEP 5 COMPLETE: FCFS, manual decisions, quiz top-N and first-qualified admissions
+  STEP 6 COMPLETE: access QRs (replay, mismatch, counted, toggle, offline), complaints and announcements
+  STEP 7 COMPLETE: completed E1 and filed report 5766be1a-1e5d-4526-84f6-2ebdb8a282ce (10076 bytes) at docs/autonomous-drone-lab-report.pdf
+
+Final report
+  docs/autonomous-drone-lab-report.pdf (10 KB, SHA-256 checksum verified by the API)
+
+==================== STEP 1 ====================
+✓ 200 POST /auth/login admin@northfield.edu (418ms)
+✓ 201 POST /departments Computer Science & Engineering (27ms)
+✓ 201 POST /departments Electronics & Communication (18ms)
+✓ 201 POST /departments Mechanical Engineering (13ms)
+  ✓ three departments created
+✓ 201 POST /departments/programs B.Tech Computer Science (13ms)
+✓ 201 POST /departments/programs B.Tech Electronics (12ms)
+✓ 201 POST /departments/programs B.Tech Mechanical (13ms)
+✓ 201 POST /departments/programs M.Tech Data Science (10ms)
+✓ 201 POST /departments/programs MBA Technology Management (13ms)
+  ✓ five programmes created
+✓ 200 GET /auth/programs public programme list (5ms)
+  ✓ public registration sees all five programmes
+✓ 201 POST /admin/staff hod.cse@northfield.edu (24ms)
+✓ 200 POST /auth/forgot-password setup mail hod.cse@northfield.edu (14ms)
+✓ 200 POST /auth/reset-password staff setup (288ms)
+✓ 200 POST /auth/login hod.cse@northfield.edu (254ms)
+✓ 201 POST /admin/users/b61d1b6b-5a59-4429-8857-a29554313f81/roles HOD CSE (19ms)
+✓ 201 POST /admin/staff hod.ece@northfield.edu (20ms)
+✓ 200 POST /auth/forgot-password setup mail hod.ece@northfield.edu (11ms)
+✓ 200 POST /auth/reset-password staff setup (241ms)
+✓ 200 POST /auth/login hod.ece@northfield.edu (207ms)
+✓ 201 POST /admin/users/d4e84fcb-3955-4c9a-81c8-5b12c42dc7ed/roles HOD ECE (11ms)
+✓ 201 POST /admin/staff hod.mech@northfield.edu (15ms)
+✓ 200 POST /auth/forgot-password setup mail hod.mech@northfield.edu (9ms)
+✓ 200 POST /auth/reset-password staff setup (248ms)
+✓ 200 POST /auth/login hod.mech@northfield.edu (211ms)
+✓ 201 POST /admin/users/6f90006e-4ff8-4492-8196-9aa2a5ff2db8/roles HOD MECH (10ms)
+  ✓ three HODs provisioned, set up and scoped to their departments
+✓ 201 POST /admin/staff faculty.1@northfield.edu (12ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.1@northfield.edu (7ms)
+✓ 200 POST /auth/reset-password staff setup (222ms)
+✓ 200 POST /auth/login faculty.1@northfield.edu (211ms)
+✓ 201 POST /admin/users/10591888-18b5-4241-957e-772ac75d1830/roles FACULTY faculty.1@northfield.edu (10ms)
+✓ 201 POST /admin/staff faculty.2@northfield.edu (16ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.2@northfield.edu (9ms)
+✓ 200 POST /auth/reset-password staff setup (385ms)
+✓ 200 POST /auth/login faculty.2@northfield.edu (244ms)
+✓ 201 POST /admin/users/97edab9d-f16c-46b8-8f62-dba10f65c9da/roles FACULTY faculty.2@northfield.edu (8ms)
+✓ 201 POST /admin/staff faculty.3@northfield.edu (9ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.3@northfield.edu (5ms)
+✓ 200 POST /auth/reset-password staff setup (296ms)
+✓ 200 POST /auth/login faculty.3@northfield.edu (212ms)
+✓ 201 POST /admin/users/b019773a-4ee9-4a9f-8efa-282b8af8857f/roles FACULTY faculty.3@northfield.edu (9ms)
+✓ 201 POST /admin/staff faculty.4@northfield.edu (9ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.4@northfield.edu (6ms)
+✓ 200 POST /auth/reset-password staff setup (235ms)
+✓ 200 POST /auth/login faculty.4@northfield.edu (239ms)
+✓ 201 POST /admin/users/5a1dd29e-d3bc-4b53-99ca-0d7843786bbd/roles FACULTY faculty.4@northfield.edu (8ms)
+✓ 201 POST /admin/staff faculty.5@northfield.edu (9ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.5@northfield.edu (6ms)
+✓ 200 POST /auth/reset-password staff setup (225ms)
+✓ 200 POST /auth/login faculty.5@northfield.edu (280ms)
+✓ 201 POST /admin/users/e6300d83-6d28-44df-92dd-ea9dadfa65db/roles FACULTY faculty.5@northfield.edu (12ms)
+✓ 201 POST /admin/staff faculty.6@northfield.edu (13ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.6@northfield.edu (8ms)
+✓ 200 POST /auth/reset-password staff setup (224ms)
+✓ 200 POST /auth/login faculty.6@northfield.edu (207ms)
+✓ 201 POST /admin/users/25da038c-0fda-49a5-8f29-b45de9de377c/roles FACULTY faculty.6@northfield.edu (9ms)
+✓ 201 POST /admin/staff faculty.7@northfield.edu (11ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.7@northfield.edu (6ms)
+✓ 200 POST /auth/reset-password staff setup (222ms)
+✓ 200 POST /auth/login faculty.7@northfield.edu (208ms)
+✓ 201 POST /admin/users/1c1b1574-0ca4-4648-9134-f5fd87d60436/roles FACULTY faculty.7@northfield.edu (9ms)
+✓ 201 POST /admin/staff faculty.8@northfield.edu (10ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.8@northfield.edu (6ms)
+✓ 200 POST /auth/reset-password staff setup (221ms)
+✓ 200 POST /auth/login faculty.8@northfield.edu (250ms)
+✓ 201 POST /admin/users/157cf3b0-ce63-41a1-97bb-a4cb71f89649/roles FACULTY faculty.8@northfield.edu (9ms)
+✓ 201 POST /admin/staff faculty.9@northfield.edu (13ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.9@northfield.edu (8ms)
+✓ 200 POST /auth/reset-password staff setup (257ms)
+✓ 200 POST /auth/login faculty.9@northfield.edu (264ms)
+✓ 201 POST /admin/users/d00f82da-46ab-4e84-b63a-e78ae3bcfba8/roles FACULTY faculty.9@northfield.edu (11ms)
+✓ 201 POST /admin/staff faculty.10@northfield.edu (11ms)
+✓ 200 POST /auth/forgot-password setup mail faculty.10@northfield.edu (7ms)
+✓ 200 POST /auth/reset-password staff setup (240ms)
+✓ 200 POST /auth/login faculty.10@northfield.edu (215ms)
+✓ 201 POST /admin/users/5a4c26ed-dee8-4f46-9549-d0d2a7cd73b9/roles FACULTY faculty.10@northfield.edu (8ms)
+  ✓ ten faculty provisioned, activated and granted department-scoped FACULTY
+✓ 201 POST /auth/register/college college student.1@northfield.edu (211ms)
+✓ 200 POST /auth/verify-email verify email (7ms)
+✓ 201 POST /auth/register/college college student.2@northfield.edu (276ms)
+✓ 200 POST /auth/verify-email verify email (10ms)
+✓ 201 POST /auth/register/college college student.3@northfield.edu (213ms)
+✓ 200 POST /auth/verify-email verify email (9ms)
+✓ 201 POST /auth/register/college college student.4@northfield.edu (254ms)
+✓ 200 POST /auth/verify-email verify email (11ms)
+✓ 201 POST /auth/register/college college student.5@northfield.edu (327ms)
+✓ 200 POST /auth/verify-email verify email (15ms)
+✓ 201 POST /auth/register/college college student.6@northfield.edu (306ms)
+✓ 200 POST /auth/verify-email verify email (8ms)
+✓ 201 POST /auth/register/college college student.7@northfield.edu (220ms)
+✓ 200 POST /auth/verify-email verify email (10ms)
+  ✓ seven college students registered from the mobile flow and verified their email
+✓ 201 POST /auth/register/outsider outsider outsider.1@example.com (254ms)
+✓ 200 POST /auth/verify-email verify email (9ms)
+✓ 201 POST /auth/register/outsider outsider outsider.2@example.com (277ms)
+✓ 200 POST /auth/verify-email verify email (7ms)
+✓ 201 POST /auth/register/outsider outsider outsider.3@example.com (321ms)
+✓ 200 POST /auth/verify-email verify email (7ms)
+✓ 201 POST /auth/register/outsider outsider outsider.4@example.com (232ms)
+✓ 200 POST /auth/verify-email verify email (7ms)
+✓ 201 POST /auth/register/outsider outsider outsider.5@example.com (200ms)
+✓ 200 POST /auth/verify-email verify email (7ms)
+  ✓ five outside students registered from the mobile flow
+✓ 200 POST /auth/login student.1@northfield.edu (233ms)
+✓ 200 POST /auth/login student.2@northfield.edu (224ms)
+✓ 200 POST /auth/login student.3@northfield.edu (210ms)
+✓ 200 POST /auth/login student.4@northfield.edu (208ms)
+✓ 200 POST /auth/login student.5@northfield.edu (219ms)
+✓ 200 POST /auth/login student.6@northfield.edu (257ms)
+✓ 200 POST /auth/login student.7@northfield.edu (260ms)
+✓ 200 POST /auth/login outsider.1@example.com (210ms)
+✓ 200 POST /auth/login outsider.2@example.com (223ms)
+✓ 200 POST /auth/login outsider.3@example.com (214ms)
+✓ 200 POST /auth/login outsider.4@example.com (209ms)
+✓ 200 POST /auth/login outsider.5@example.com (328ms)
+SETUP COMPLETE
+{
+  "departments": {
+    "CSE": {
+      "id": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "code": "CSE",
+      "name": "Computer Science & Engineering",
+      "createdAt": "2026-11-04T05:44:54.919Z"
+    },
+    "ECE": {
+      "id": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "code": "ECE",
+      "name": "Electronics & Communication",
+      "createdAt": "2026-11-04T05:44:54.942Z"
+    },
+    "MECH": {
+      "id": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "code": "MECH",
+      "name": "Mechanical Engineering",
+      "createdAt": "2026-11-04T05:44:54.956Z"
+    }
+  },
+  "programs": [
+    {
+      "id": "985fcd0c-bb62-490f-b5ca-15512a663f6a",
+      "name": "B.Tech Computer Science",
+      "isActive": true,
+      "createdAt": "2026-11-04T05:44:54.969Z"
+    },
+    {
+      "id": "4a209121-13df-434c-96cc-3d31ffe025be",
+      "name": "B.Tech Electronics",
+      "isActive": true,
+      "createdAt": "2026-11-04T05:44:54.981Z"
+    },
+    {
+      "id": "fbf8911a-e6f8-4638-b75e-d47746f3f40a",
+      "name": "B.Tech Mechanical",
+      "isActive": true,
+      "createdAt": "2026-11-04T05:44:54.994Z"
+    },
+    {
+      "id": "df2ab566-8475-4b53-831e-a6e03bf470ac",
+      "name": "M.Tech Data Science",
+      "isActive": true,
+      "createdAt": "2026-11-04T05:44:55.004Z"
+    },
+    {
+      "id": "2e70bbb9-40d1-46be-9cb8-7c2857525380",
+      "name": "MBA Technology Management",
+      "isActive": true,
+      "createdAt": "2026-11-04T05:44:55.017Z"
+    }
+  ],
+  "hods": [
+    {
+      "email": "hod.cse@northfield.edu",
+      "fullName": "Dr. Kavita Menon",
+      "designation": "Head of Department",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "phone": "+91 98100 10000",
+      "employeeCode": "HOD-CSE-01",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "b61d1b6b-5a59-4429-8857-a29554313f81",
+        "email": "hod.cse@northfield.edu",
+        "fullName": "Dr. Kavita Menon",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98100 10000",
+        "createdAt": "2026-11-04T05:44:55.042Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjFkMWI2Yi01YTU5LTQ0MjktODg1Ny1hMjk1NTQzMTNmODEiLCJzaWQiOiJhNDU5OWM4OS00NWJmLTQ0OWUtOTFlYi0yMzFkNmUwZDdlNGEiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk1LCJleHAiOjE3OTM3NzE5OTV9.GDiAf6nt8N0A1QQa23fVaJ1w61Y1KGTiGW2NUe7PKns",
+      "userId": "b61d1b6b-5a59-4429-8857-a29554313f81",
+      "departmentCode": "CSE"
+    },
+    {
+      "email": "hod.ece@northfield.edu",
+      "fullName": "Dr. Arun Prasad",
+      "designation": "Head of Department",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "phone": "+91 98100 10001",
+      "employeeCode": "HOD-ECE-01",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "d4e84fcb-3955-4c9a-81c8-5b12c42dc7ed",
+        "email": "hod.ece@northfield.edu",
+        "fullName": "Dr. Arun Prasad",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98100 10001",
+        "createdAt": "2026-11-04T05:44:55.640Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNGU4NGZjYi0zOTU1LTRjOWEtODFjOC01YjEyYzQyZGM3ZWQiLCJzaWQiOiJiMzQ4YTFjMy05NTNkLTQ5YWQtYTAxZi0yMzNmNWIwMDk2NjQiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk2LCJleHAiOjE3OTM3NzE5OTZ9.QZXNAHaEaw_Dfz97anyO0tWfC4sOeB34Va5azCSun20",
+      "userId": "d4e84fcb-3955-4c9a-81c8-5b12c42dc7ed",
+      "departmentCode": "ECE"
+    },
+    {
+      "email": "hod.mech@northfield.edu",
+      "fullName": "Dr. Neha Kulkarni",
+      "designation": "Head of Department",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "phone": "+91 98100 10002",
+      "employeeCode": "HOD-MECH-01",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "6f90006e-4ff8-4492-8196-9aa2a5ff2db8",
+        "email": "hod.mech@northfield.edu",
+        "fullName": "Dr. Neha Kulkarni",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98100 10002",
+        "createdAt": "2026-11-04T05:44:56.127Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ZjkwMDA2ZS00ZmY4LTQ0OTItODE5Ni05YWEyYTVmZjJkYjgiLCJzaWQiOiJlYTZjZjdlOC02MjMyLTRmOTQtODM2MS1lZjNlNjc3NTFkMjQiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk2LCJleHAiOjE3OTM3NzE5OTZ9.6XBSDJJOComeYXX4FE39GjmE7YZZWyIwN06QtFbCCS0",
+      "userId": "6f90006e-4ff8-4492-8196-9aa2a5ff2db8",
+      "departmentCode": "MECH"
+    }
+  ],
+  "faculty": [
+    {
+      "email": "faculty.1@northfield.edu",
+      "fullName": "Prof. Rohan Deshpande",
+      "designation": "Assistant Professor",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "phone": "+91 98200 20000",
+      "employeeCode": "FAC-CSE-01",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "10591888-18b5-4241-957e-772ac75d1830",
+        "email": "faculty.1@northfield.edu",
+        "fullName": "Prof. Rohan Deshpande",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20000",
+        "createdAt": "2026-11-04T05:44:56.619Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDU5MTg4OC0xOGI1LTQyNDEtOTU3ZS03NzJhYzc1ZDE4MzAiLCJzaWQiOiJmMjY1MTk4My0yNjE2LTRjYjEtYmM1YS0zODg2Nzk3M2NhNTYiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk3LCJleHAiOjE3OTM3NzE5OTd9.aRcyhrZZRiS4ihHdeI3tfLZHT2xuP_GzJuUYeVQf0aI",
+      "userId": "10591888-18b5-4241-957e-772ac75d1830",
+      "departmentCode": "CSE"
+    },
+    {
+      "email": "faculty.2@northfield.edu",
+      "fullName": "Prof. Sneha Iyer",
+      "designation": "Associate Professor",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "phone": "+91 98200 20001",
+      "employeeCode": "FAC-ECE-02",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "97edab9d-f16c-46b8-8f62-dba10f65c9da",
+        "email": "faculty.2@northfield.edu",
+        "fullName": "Prof. Sneha Iyer",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20001",
+        "createdAt": "2026-11-04T05:44:57.084Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5N2VkYWI5ZC1mMTZjLTQ2YjgtOGY2Mi1kYmExMGY2NWM5ZGEiLCJzaWQiOiIzZTQ2MmNlYi0xNzc5LTRhZWMtOTNlYS02ZDhiOTAyZWIzNWQiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk3LCJleHAiOjE3OTM3NzE5OTd9.sMaPk8RRhAUYrVs7FBKgIKrNjXbQVTJR3yccsv0nhZI",
+      "userId": "97edab9d-f16c-46b8-8f62-dba10f65c9da",
+      "departmentCode": "ECE"
+    },
+    {
+      "email": "faculty.3@northfield.edu",
+      "fullName": "Prof. Vikram Bhatt",
+      "designation": "Assistant Professor",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "phone": "+91 98200 20002",
+      "employeeCode": "FAC-MECH-03",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "b019773a-4ee9-4a9f-8efa-282b8af8857f",
+        "email": "faculty.3@northfield.edu",
+        "fullName": "Prof. Vikram Bhatt",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20002",
+        "createdAt": "2026-11-04T05:44:57.744Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMDE5NzczYS00ZWU5LTRhOWYtOGVmYS0yODJiOGFmODg1N2YiLCJzaWQiOiJhMjZlYTE2NS05MmU3LTRmYjYtYTNmZS0wZGIxZDIzYmRkZjMiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk4LCJleHAiOjE3OTM3NzE5OTh9.-pO4kzieiQQU-zmKpLNVVXqQzPbk9kvKNeX6tZ3NURU",
+      "userId": "b019773a-4ee9-4a9f-8efa-282b8af8857f",
+      "departmentCode": "MECH"
+    },
+    {
+      "email": "faculty.4@northfield.edu",
+      "fullName": "Prof. Priya Nair",
+      "designation": "Associate Professor",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "phone": "+91 98200 20003",
+      "employeeCode": "FAC-CSE-04",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "5a1dd29e-d3bc-4b53-99ca-0d7843786bbd",
+        "email": "faculty.4@northfield.edu",
+        "fullName": "Prof. Priya Nair",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20003",
+        "createdAt": "2026-11-04T05:44:58.276Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1YTFkZDI5ZS1kM2JjLTRiNTMtOTljYS0wZDc4NDM3ODZiYmQiLCJzaWQiOiI0MjYyZDRhOS0yNTMzLTQ2YjktYjE4NC0zYmQ4YmFjNDc0ZWEiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk4LCJleHAiOjE3OTM3NzE5OTh9.YtI19nS2cmkglQ8Yx8Xm_tkrP3Ihgq3uQs2X4gnC-R8",
+      "userId": "5a1dd29e-d3bc-4b53-99ca-0d7843786bbd",
+      "departmentCode": "CSE"
+    },
+    {
+      "email": "faculty.5@northfield.edu",
+      "fullName": "Prof. Kabir Shah",
+      "designation": "Assistant Professor",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "phone": "+91 98200 20004",
+      "employeeCode": "FAC-ECE-05",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "e6300d83-6d28-44df-92dd-ea9dadfa65db",
+        "email": "faculty.5@northfield.edu",
+        "fullName": "Prof. Kabir Shah",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20004",
+        "createdAt": "2026-11-04T05:44:58.773Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNjMwMGQ4My02ZDI4LTQ0ZGYtOTJkZC1lYTlkYWRmYTY1ZGIiLCJzaWQiOiI4NWQ0MGNlNy05NzZkLTQ1OTUtYmMyMy05MTI1NmUyZTE1OGEiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk5LCJleHAiOjE3OTM3NzE5OTl9.-tpHrFr3rqoVJuVp8dbIOr6IeUiCpnGclsR9tjIlkMM",
+      "userId": "e6300d83-6d28-44df-92dd-ea9dadfa65db",
+      "departmentCode": "ECE"
+    },
+    {
+      "email": "faculty.6@northfield.edu",
+      "fullName": "Prof. Meghna Joshi",
+      "designation": "Associate Professor",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "phone": "+91 98200 20005",
+      "employeeCode": "FAC-MECH-06",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "25da038c-0fda-49a5-8f29-b45de9de377c",
+        "email": "faculty.6@northfield.edu",
+        "fullName": "Prof. Meghna Joshi",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20005",
+        "createdAt": "2026-11-04T05:44:59.308Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNWRhMDM4Yy0wZmRhLTQ5YTUtOGYyOS1iNDVkZTlkZTM3N2MiLCJzaWQiOiI2YzBkYmYyMy1kZGNkLTRhNWYtOGVmYS0xNWJkMjEzODUxNTUiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMDk5LCJleHAiOjE3OTM3NzE5OTl9.vTTRnpGZK47fqceEVmoSQGTdj9cU7Ol83Qr_bU6GPkA",
+      "userId": "25da038c-0fda-49a5-8f29-b45de9de377c",
+      "departmentCode": "MECH"
+    },
+    {
+      "email": "faculty.7@northfield.edu",
+      "fullName": "Prof. Aditya Verma",
+      "designation": "Assistant Professor",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "phone": "+91 98200 20006",
+      "employeeCode": "FAC-CSE-07",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "1c1b1574-0ca4-4648-9134-f5fd87d60436",
+        "email": "faculty.7@northfield.edu",
+        "fullName": "Prof. Aditya Verma",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20006",
+        "createdAt": "2026-11-04T05:44:59.767Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYzFiMTU3NC0wY2E0LTQ2NDgtOTEzNC1mNWZkODdkNjA0MzYiLCJzaWQiOiIyZjljZmRmZi0yN2Y5LTRhNDEtODE2OC1hMWEyNmNmYTkzYjciLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMTAwLCJleHAiOjE3OTM3NzIwMDB9.kPZuBkRBU9Go27dyqMmccIgCK8jOufSyGt7G8ZMMqqc",
+      "userId": "1c1b1574-0ca4-4648-9134-f5fd87d60436",
+      "departmentCode": "CSE"
+    },
+    {
+      "email": "faculty.8@northfield.edu",
+      "fullName": "Prof. Tara Reddy",
+      "designation": "Associate Professor",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "phone": "+91 98200 20007",
+      "employeeCode": "FAC-ECE-08",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "157cf3b0-ce63-41a1-97bb-a4cb71f89649",
+        "email": "faculty.8@northfield.edu",
+        "fullName": "Prof. Tara Reddy",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20007",
+        "createdAt": "2026-11-04T05:45:00.223Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNTdjZjNiMC1jZTYzLTQxYTEtOTdiYi1hNGNiNzFmODk2NDkiLCJzaWQiOiI0YTZlM2FkZS0xMDU3LTQ1MmMtYjQ2YS1mNTUwNjk0MjE0YjciLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMTAwLCJleHAiOjE3OTM3NzIwMDB9.dqOuv5LcnDfJxpP9spY2_Ih7TghWI30ruPbR1z-BPI0",
+      "userId": "157cf3b0-ce63-41a1-97bb-a4cb71f89649",
+      "departmentCode": "ECE"
+    },
+    {
+      "email": "faculty.9@northfield.edu",
+      "fullName": "Prof. Nikhil Bose",
+      "designation": "Assistant Professor",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "phone": "+91 98200 20008",
+      "employeeCode": "FAC-MECH-09",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "d00f82da-46ab-4e84-b63a-e78ae3bcfba8",
+        "email": "faculty.9@northfield.edu",
+        "fullName": "Prof. Nikhil Bose",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20008",
+        "createdAt": "2026-11-04T05:45:00.721Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMDBmODJkYS00NmFiLTRlODQtYjYzYS1lNzhhZTNiY2ZiYTgiLCJzaWQiOiIzZGNkNzcwMC0wM2NiLTQyNTgtOTUzNC0yYzAwMDliMDc5ZDgiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMTAxLCJleHAiOjE3OTM3NzIwMDF9.5jX4a1LIoo3AFDapk2slpK6K0KuyQyf9Ffb2vHdNX6g",
+      "userId": "d00f82da-46ab-4e84-b63a-e78ae3bcfba8",
+      "departmentCode": "MECH"
+    },
+    {
+      "email": "faculty.10@northfield.edu",
+      "fullName": "Prof. Ishita Ghosh",
+      "designation": "Associate Professor",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "phone": "+91 98200 20009",
+      "employeeCode": "FAC-CSE-10",
+      "password": "Northfield#2026",
+      "user": {
+        "id": "5a4c26ed-dee8-4f46-9549-d0d2a7cd73b9",
+        "email": "faculty.10@northfield.edu",
+        "fullName": "Prof. Ishita Ghosh",
+        "accountType": "STAFF",
+        "status": "PENDING_EMAIL",
+        "emailVerifiedAt": null,
+        "phone": "+91 98200 20009",
+        "createdAt": "2026-11-04T05:45:01.273Z"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1YTRjMjZlZC1kZWU4LTRmNDYtOTU0OS1kMGQyYTdjZDczYjkiLCJzaWQiOiJlYmYzZTU5Yi0yYThkLTQyYjQtYWYzZi1kYTAzZWUxODU0NTgiLCJhY2NvdW50VHlwZSI6IlNUQUZGIiwiaWF0IjoxNzkzNzcxMTAxLCJleHAiOjE3OTM3NzIwMDF9.Y3DGsbyK3w_KRNEQrSpLUhUBAYzGorpcBdUv7TbCAMQ",
+      "userId": "5a4c26ed-dee8-4f46-9549-d0d2a7cd73b9",
+      "departmentCode": "CSE"
+    }
+  ],
+  "students": [
+    {
+      "email": "student.1@northfield.edu",
+      "fullName": "Aarav Sharma",
+      "phone": "+91 98765 43000",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "CSE2026001",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "program": "B.Tech Computer Science",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-CSE-1000",
+      "password": "Northfield#2026",
+      "departmentCode": "CSE",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NWU2MDQ3Ny0yOTQ3LTQ1YzYtOTQ1MC0zMzgwYTEyODc4ZTUiLCJzaWQiOiJiYTA2MTZiNy0wNWQ5LTRlN2YtOTJlMy1hMWE4MjFkMzBiN2IiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNSwiZXhwIjoxNzkzNzcyMDA1fQ.I_uQEgaPYq5oA-XYRrWGxknHWSjSW8kN1yNz9REtFEQ",
+      "refreshToken": "5i6GZ8ubw4BfHa-56XfZYtAmfD_bUguWufBTj2EQBFoRRAwg2ZAkGSQz4zrmvb3g",
+      "userId": "45e60477-2947-45c6-9450-3380a12878e5"
+    },
+    {
+      "email": "student.2@northfield.edu",
+      "fullName": "Diya Patel",
+      "phone": "+91 98765 43001",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "CSE2026002",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "program": "B.Tech Computer Science",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-CSE-1001",
+      "password": "Northfield#2026",
+      "departmentCode": "CSE",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ZWE1ZjUwNS1iZWMwLTQ2NjEtOTAyYS04MTg3ZTMwNWJmYzciLCJzaWQiOiJkMDQzNDZlNC02MDk3LTRiYjktYjQzOS01MjI4ZjcxYzg3N2QiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNSwiZXhwIjoxNzkzNzcyMDA1fQ.M6FCXIi5vrGFBDV82xCAGWFdG5wQeqyZX08lHkB6tB4",
+      "refreshToken": "lni2SgXTmK0UaAIvjV75ism8dRi8p6wMEaCkacMsKcF8nh1qhGHOoihoLhg0oaw_",
+      "userId": "6ea5f505-bec0-4661-902a-8187e305bfc7"
+    },
+    {
+      "email": "student.3@northfield.edu",
+      "fullName": "Reyansh Gupta",
+      "phone": "+91 98765 43002",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "ECE2026003",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "program": "B.Tech Electronics",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-ECE-1002",
+      "password": "Northfield#2026",
+      "departmentCode": "ECE",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZmNiOTlmMS1jY2Q4LTQzMjYtOTBkNS03YTBjOGY0OTQyNjAiLCJzaWQiOiJmMWE2NmQ1Zi00ZTM2LTQ0ODQtOGI4My0yMDQyMGRmNzQyZGQiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNSwiZXhwIjoxNzkzNzcyMDA1fQ.dPij9HCQSlk2zewI4ZibOuHQtxISG9ClVL8M4x9rVT4",
+      "refreshToken": "tRiD4pt78z6DY_5o7uCIWea1JjPmj7awkJ9kGRGiS41-JbNHimyLeI0w52NN8Fcx",
+      "userId": "bfcb99f1-ccd8-4326-90d5-7a0c8f494260"
+    },
+    {
+      "email": "student.4@northfield.edu",
+      "fullName": "Ananya Singh",
+      "phone": "+91 98765 43003",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "MECH2026004",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "program": "B.Tech Mechanical",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-MECH-1003",
+      "password": "Northfield#2026",
+      "departmentCode": "MECH",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYmVhNTAxOC03OGEzLTRkYzYtOTFiMi1hNGUwYWJhNTVhM2YiLCJzaWQiOiI4MTAyNmMxNy1iNzFiLTQ3ZWEtYWIzMS0wY2U4ZmU2ZGIwNzciLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNSwiZXhwIjoxNzkzNzcyMDA1fQ.nEO9IztMXSgUsSUucCczLqmkVTBJwb5idU1SEiFKryw",
+      "refreshToken": "vw07TwY-KAsxZ1yqSj0-16u7Fn55HV84Vgugqw_ApqrNTAjuVV0YbfC1OnCvlIfh",
+      "userId": "ebea5018-78a3-4dc6-91b2-a4e0aba55a3f"
+    },
+    {
+      "email": "student.5@northfield.edu",
+      "fullName": "Vivaan Mehta",
+      "phone": "+91 98765 43004",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "MECH2026005",
+      "departmentId": "0b27f3d6-931d-4256-b4f3-a90d7776192c",
+      "program": "B.Tech Mechanical",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-MECH-1004",
+      "password": "Northfield#2026",
+      "departmentCode": "MECH",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNDIxZDUxOC1lNGQ0LTRhN2UtOGViNy01YTcxNDNjMmQ5OWQiLCJzaWQiOiI3OTNmOTU2Yi1lN2E1LTRkNGUtOTE3NS0zNmM4YjUyMjZjNTEiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNiwiZXhwIjoxNzkzNzcyMDA2fQ.IzwrcVOfRAVg-r5NM7VUTJJEcPzb_0mRfIEl7LdQuQA",
+      "refreshToken": "v9bi-rede3VVPTm5PvkZcmxDcwGxStHXg_KNkXagKrmSPgbFzcVn0_NDsGtpHaSD",
+      "userId": "1421d518-e4d4-4a7e-8eb7-5a7143c2d99d"
+    },
+    {
+      "email": "student.6@northfield.edu",
+      "fullName": "Isha Kapoor",
+      "phone": "+91 98765 43005",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "CSE2026006",
+      "departmentId": "5a0c5855-8482-40be-88d4-467511eb912d",
+      "program": "B.Tech Computer Science",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-CSE-1005",
+      "password": "Northfield#2026",
+      "departmentCode": "CSE",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmM2EzOWM2Ny04ZTg5LTQwZGItYTY2Ny1hMDk0ZTU5OTNiZGYiLCJzaWQiOiIxMDIwZDJjMC00NGYwLTQwNjEtOTcyMC1lMWEwMjhmNDhlN2EiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNiwiZXhwIjoxNzkzNzcyMDA2fQ.7Rh9Kj0SpUod4XYd2ZiFJEuZIgtRkKQvemTwLQAalTY",
+      "refreshToken": "ndYq8p43NgaANCoQpCONNdlhS19gBlOMmtJH9Mcm1rnB8g1nzJ-LhrZ7eM3cQEZV",
+      "userId": "f3a39c67-8e89-40db-a667-a094e5993bdf"
+    },
+    {
+      "email": "student.7@northfield.edu",
+      "fullName": "Arjun Rao",
+      "phone": "+91 98765 43006",
+      "institutionName": "Northfield Institute of Technology",
+      "rollNumber": "ECE2026007",
+      "departmentId": "fefe12e1-c236-4558-a65e-1932ccffa515",
+      "program": "B.Tech Electronics",
+      "graduationYear": 2028,
+      "collegeIdNumber": "NF-ECE-1006",
+      "password": "Northfield#2026",
+      "departmentCode": "ECE",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNWFkYzljMS05NWVkLTQyN2EtYmM0Yi1hNzNkMDNkYTE0MmQiLCJzaWQiOiI3ZWRmMDdhMC02ZjRmLTRhNTUtODE2NS1kMTI1ZWYzYzhmMmQiLCJhY2NvdW50VHlwZSI6IkNPTExFR0VfU1RVREVOVCIsImlhdCI6MTc5Mzc3MTEwNiwiZXhwIjoxNzkzNzcyMDA2fQ.eK5LTCLaENVMbK-I1RdzZeX_7uYplnpmS6jmYcDeOQ8",
+      "refreshToken": "yizltqe2TPF3wgLOkXx6OffjBs6tonGwguZMFAP_A_ePwukc0Yb7iKSKpmWUsdBG",
+      "userId": "15adc9c1-95ed-427a-bc4b-a73d03da142d"
+    }
+  ],
+  "outsiders": [
+    {
+      "email": "outsider.1@example.com",
+      "fullName": "Naina Verma",
+      "phone": "+91 90000 30000",
+      "institutionName": "Delhi Technical Campus",
+      "program": "B.Tech IT",
+      "graduationYear": 2027,
+      "password": "Northfield#2026",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMzhmMmM1Yi0yNjU2LTRhNDktYWU0MC1lM2MxZDRhODMwNTkiLCJzaWQiOiJhN2JhYzZkZC05ZjRmLTQzMWEtOWJiMC1jM2M0OWJiYWZmZjEiLCJhY2NvdW50VHlwZSI6Ik9VVFNJREVSX1NUVURFTlQiLCJpYXQiOjE3OTM3NzExMDYsImV4cCI6MTc5Mzc3MjAwNn0.C9_zKHF-s8VapXYbK8vO3oqXanbnW2-lfSsc0UP3Lwk",
+      "refreshToken": "8DROlGwa89EF1krnBXkGPBKyrvyFfJTlOovfJ96xVruWP8c6LETD9K1WzeV3xggB",
+      "userId": "038f2c5b-2656-4a49-ae40-e3c1d4a83059"
+    },
+    {
+      "email": "outsider.2@example.com",
+      "fullName": "Dev Malhotra",
+      "phone": "+91 90000 30001",
+      "institutionName": "Amity School of Engineering",
+      "program": "B.Tech ECE",
+      "graduationYear": 2027,
+      "password": "Northfield#2026",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzUxMmI5OS1kNTFjLTRlNzgtOTdiMi0yMmJmN2Q3OWM5MmMiLCJzaWQiOiJlNGVkZTZiZi1lNmJmLTRlOTQtYTIxNC02NDJiZDI0ZTBkOTAiLCJhY2NvdW50VHlwZSI6Ik9VVFNJREVSX1NUVURFTlQiLCJpYXQiOjE3OTM3NzExMDYsImV4cCI6MTc5Mzc3MjAwNn0.fj0VC6Yp-4o2N7dXy07EqMlHhdapDwVQhqLHysdhatM",
+      "refreshToken": "dEPloi7UjS4gsQzUzmUvXcxUryWp30_yZ-8kQBkEPEyOStoIBdxX_ljWgl0ROYfT",
+      "userId": "9c512b99-d51c-4e78-97b2-22bf7d79c92c"
+    },
+    {
+      "email": "outsider.3@example.com",
+      "fullName": "Sara Khan",
+      "phone": "+91 90000 30002",
+      "institutionName": "VIT Vellore",
+      "program": "BBA",
+      "graduationYear": 2027,
+      "password": "Northfield#2026",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZWZiMDAxOC04MzY5LTQxYWYtYjllMS04Yjg1YzJiOGRjOWMiLCJzaWQiOiJhMmJiODE2NS02YTU4LTQ5OTQtODY3Yy04MWJiODE5ZGRmMjMiLCJhY2NvdW50VHlwZSI6Ik9VVFNJREVSX1NUVURFTlQiLCJpYXQiOjE3OTM3NzExMDcsImV4cCI6MTc5Mzc3MjAwN30.5els29drzWgWkqWqm_WNkMsNIuyhYzjK2OGnBzgy6tE",
+      "refreshToken": "B9YM7zmRh07frFOhFT70Uq5IaC5qhpdk3JLWeXsmLPFCJpkQBL1Bm4ZDwH51Lo6p",
+      "userId": "aefb0018-8369-41af-b9e1-8b85c2b8dc9c"
+    },
+    {
+      "email": "outsider.4@example.com",
+      "fullName": "Yash Thakur",
+      "phone": "+91 90000 30003",
+      "institutionName": "Delhi Technical Campus",
+      "program": "B.Tech IT",
+      "graduationYear": 2027,
+      "password": "Northfield#2026",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzZTM5ZDU3Yi1kYjVjLTQ5ZWYtYmE3NS0zOWM1ZmNjZjgzNmEiLCJzaWQiOiI1YTU0NTcxMS1mZDYxLTQ2MDMtOTFhMC0zYThjODQzMTkzNTciLCJhY2NvdW50VHlwZSI6Ik9VVFNJREVSX1NUVURFTlQiLCJpYXQiOjE3OTM3NzExMDcsImV4cCI6MTc5Mzc3MjAwN30.FiT7caEwj0X6f-5p68y39sznE2CV3LlkdAOQj9kSPHU",
+      "refreshToken": "SPfm70ieYvDIg3ZmpUGpGgmzbDZniadccw4hlCEYZtDZaJNggoI9hkq3_NpMOwuX",
+      "userId": "3e39d57b-db5c-49ef-ba75-39c5fccf836a"
+    },
+    {
+      "email": "outsider.5@example.com",
+      "fullName": "Mira Sen",
+      "phone": "+91 90000 30004",
+      "institutionName": "Amity School of Engineering",
+      "program": "B.Tech ECE",
+      "graduationYear": 2027,
+      "password": "Northfield#2026",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmMGVhNmIwNS0xYjc3LTQxYWYtYWU5OC05MjdlNDhmMjRhM2MiLCJzaWQiOiJhOTM5NTBiYS05ZjQxLTRjZTctODIwOS02Zjk4YWIxYmIyMzkiLCJhY2NvdW50VHlwZSI6Ik9VVFNJREVSX1NUVURFTlQiLCJpYXQiOjE3OTM3NzExMDcsImV4cCI6MTc5Mzc3MjAwN30.H79ElXD58fTgSc2uHH0a6NiLWl2v08ppFC-OBhyOUlQ",
+      "refreshToken": "gXgKRVgymMjQgadJXSU9xqaOK00gb0fjEC54DE-FoFKXH6cQXXuyeu0j0LLhfqNd",
+      "userId": "f0ea6b05-1b77-41af-ae98-927e48f24a3c"
+    }
+  ]
+}
+
+==================== STEP 2 ====================
+✓ 200 GET /faculty/verification-queue?limit=100  (54ms)
+queue size: 3 Aarav Sharma:PENDING_VERIFICATION, Diya Patel:PENDING_VERIFICATION, Isha Kapoor:PENDING_VERIFICATION
+  ✓ a CSE faculty member sees only the three CSE students awaiting verification
+✗ 403 POST /faculty/students/45e60477-2947-45c6-9450-3380a12878e5/verify HOD verifies own-department student (16ms)
+  response: {"error":{"code":"FORBIDDEN","message":"Insufficient role.","requestId":"903582cb-4850-4ebc-9b96-f85ccbf7e1ac"}}
+  ! HOD could not verify a student in their own department
+✓ 200 GET /faculty/verification-queue?limit=100  (12ms)
+✓ 200 POST /faculty/students/45e60477-2947-45c6-9450-3380a12878e5/verify Aarav Sharma (11ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (12ms)
+✓ 200 POST /faculty/students/6ea5f505-bec0-4661-902a-8187e305bfc7/verify Diya Patel (8ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (12ms)
+✓ 200 POST /faculty/students/bfcb99f1-ccd8-4326-90d5-7a0c8f494260/verify Reyansh Gupta (7ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (14ms)
+✓ 200 POST /faculty/students/ebea5018-78a3-4dc6-91b2-a4e0aba55a3f/verify Ananya Singh (9ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (5ms)
+✓ 200 POST /faculty/students/1421d518-e4d4-4a7e-8eb7-5a7143c2d99d/verify Vivaan Mehta (8ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (4ms)
+✓ 200 POST /faculty/students/f3a39c67-8e89-40db-a667-a094e5993bdf/verify Isha Kapoor (8ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (5ms)
+✓ 200 POST /faculty/students/15adc9c1-95ed-427a-bc4b-a73d03da142d/verify Arjun Rao (9ms)
+✓ 200 GET /faculty/verification-queue?limit=100  (5ms)
+  ✓ CSE verification queue is empty
+✓ 200 GET /faculty/verification-queue?limit=100  (6ms)
+  ✓ ECE verification queue is empty
+✓ 200 GET /faculty/verification-queue?limit=100  (4ms)
+  ✓ MECH verification queue is empty
+✓ 200 GET /me Aarav Sharma (11ms)
+  ✓ Aarav Sharma is ACTIVE after verification
+  ✓ Aarav Sharma's phone is stored
+✓ 200 GET /me Diya Patel (8ms)
+  ✓ Diya Patel is ACTIVE after verification
+  ✓ Diya Patel's phone is stored
+✓ 200 GET /me Reyansh Gupta (6ms)
+  ✓ Reyansh Gupta is ACTIVE after verification
+  ✓ Reyansh Gupta's phone is stored
+✓ 200 GET /me Ananya Singh (7ms)
+  ✓ Ananya Singh is ACTIVE after verification
+  ✓ Ananya Singh's phone is stored
+✓ 200 GET /me Vivaan Mehta (6ms)
+  ✓ Vivaan Mehta is ACTIVE after verification
+  ✓ Vivaan Mehta's phone is stored
+✓ 200 GET /me Isha Kapoor (5ms)
+  ✓ Isha Kapoor is ACTIVE after verification
+  ✓ Isha Kapoor's phone is stored
+✓ 200 GET /me Arjun Rao (7ms)
+  ✓ Arjun Rao is ACTIVE after verification
+  ✓ Arjun Rao's phone is stored
+✓ 201 POST /clubs Robotics Society (7ms)
+✓ 201 POST /clubs/4ed9c378-8c04-4cbb-a62c-d0e203b5ef01/members lead Aarav Sharma (9ms)
+✓ 201 POST /clubs/4ed9c378-8c04-4cbb-a62c-d0e203b5ef01/members lead Diya Patel (8ms)
+✓ 201 POST /clubs/4ed9c378-8c04-4cbb-a62c-d0e203b5ef01/members coordinator Isha Kapoor (9ms)
+✓ 201 POST /clubs/4ed9c378-8c04-4cbb-a62c-d0e203b5ef01/members club faculty Prof. Rohan Deshpande (9ms)
+✓ 201 POST /clubs Debating Union (6ms)
+✓ 201 POST /clubs/0e1ba489-6f80-4385-80a8-abbb86f1ce50/members lead Reyansh Gupta (9ms)
+✓ 201 POST /clubs/0e1ba489-6f80-4385-80a8-abbb86f1ce50/members coordinator Arjun Rao (7ms)
+✓ 201 POST /clubs/0e1ba489-6f80-4385-80a8-abbb86f1ce50/members club faculty Prof. Sneha Iyer (10ms)
+✓ 201 POST /clubs Sports Council (6ms)
+✓ 201 POST /clubs/8f74c030-4351-4559-8646-36b141404ff0/members lead Ananya Singh (10ms)
+✓ 201 POST /clubs/8f74c030-4351-4559-8646-36b141404ff0/members lead Vivaan Mehta (13ms)
+✓ 201 POST /clubs/8f74c030-4351-4559-8646-36b141404ff0/members club faculty Prof. Vikram Bhatt (10ms)
+  ✓ three clubs created with leads, coordinators and club faculty
+  ✓ five students hold LEAD memberships
+  ✓ two students hold COORDINATOR memberships
+✓ 200 GET /me  (7ms)
+  ✓ Aarav Sharma sees the LEAD role on /me
+✓ 200 GET /me  (7ms)
+  ✓ Diya Patel sees the LEAD role on /me
+✓ 200 GET /me  (6ms)
+  ✓ Isha Kapoor sees the COORDINATOR role on /me
+✓ 200 GET /me  (6ms)
+  ✓ Reyansh Gupta sees the LEAD role on /me
+✓ 200 GET /me  (6ms)
+  ✓ Arjun Rao sees the COORDINATOR role on /me
+✓ 200 GET /me  (7ms)
+  ✓ Ananya Singh sees the LEAD role on /me
+✓ 200 GET /me  (5ms)
+  ✓ Vivaan Mehta sees the LEAD role on /me
+STEP 2 COMPLETE
+
+==================== STEP 3 ====================
+✓ 201 POST /resources auditorium (57ms)
+✓ 200 GET /resources/8ac70570-8536-437f-bbd4-44bcb0ff2f25  (11ms)
+  ✓ auditorium has one bookable unit
+✓ 201 POST /events Autonomous Drone Lab (13ms)
+  ✓ E1 starts as a draft
+✓ 201 POST /events Founders' Table: Building in Public (10ms)
+  ✓ E2 starts as a draft
+✓ 201 POST /events Circuit Sprint Hackathon (9ms)
+  ✓ E3 starts as a draft
+✓ 200 PUT /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz quiz E3 (19ms)
+✓ 200 PATCH /events/c4f30d5d-6552-448a-a370-75d6e3bac865 admission QUIZ_TOP_N (10ms)
+  ✓ E3 now uses QUIZ_TOP_N
+✓ 201 POST /events Inter-College Sports Meet (9ms)
+  ✓ E4 starts as a draft
+✓ 200 PUT /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz quiz E4 (21ms)
+✓ 200 PATCH /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e admission QUIZ_FIRST_QUALIFIED (11ms)
+  ✓ E4 now uses QUIZ_FIRST_QUALIFIED
+✓ 201 POST /events Alumni Webinar: Life After Campus (14ms)
+  ✓ E5 starts as a draft
+✓ 200 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/submit submit E1 (39ms)
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/approval-bundle bundle E1 (20ms)
+  ✓ E1 is awaiting approval
+  ✓ E1 has one request per permission
+  ✓ E1 bundle summary counts required requests
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/submit submit E2 (30ms)
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/approval-bundle bundle E2 (12ms)
+  ✓ E2 is awaiting approval
+  ✓ E2 has one request per permission
+  ✓ E2 bundle summary counts required requests
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/submit submit E3 (15ms)
+✓ 200 GET /events/c4f30d5d-6552-448a-a370-75d6e3bac865/approval-bundle bundle E3 (7ms)
+  ✓ E3 is awaiting approval
+  ✓ E3 has one request per permission
+  ✓ E3 bundle summary counts required requests
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/submit submit E4 (22ms)
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (8ms)
+  ✓ E4 is awaiting approval
+  ✓ E4 has one request per permission
+  ✓ E4 bundle summary counts required requests
+✓ 200 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/submit submit E5 (18ms)
+✓ 200 GET /events/a7477050-161a-4891-b47d-37cfa6a9b58a/approval-bundle bundle E5 (8ms)
+  ✓ E5 is awaiting approval
+  ✓ E5 has one request per permission
+  ✓ E5 bundle summary counts required requests
+STEP 3 COMPLETE: five drafts submitted, each permission as its own request
+
+==================== STEP 4 ====================
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/approval-bundle bundle E1 (54ms)
+✓ 422 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/publish publish blocked before approvals (13ms)
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/approval-bundle bundle E1 (12ms)
+✓ 200 POST /approval-requests/e9b226cd-4aa0-4d9b-8d62-e747281d886d/decision faculty rejects optional livestream (20ms)
+✓ 200 POST /approval-requests/3d0c85c7-4c88-4bd5-bf80-623bd1f61c80/decision E1 RESOURCE_USE (22ms)
+✓ 200 POST /approval-requests/61a2066b-b1e1-446a-a104-976380ba5a7d/decision E1 ORGANIZE (15ms)
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/approval-bundle bundle E1 (9ms)
+  ✓ E1 is ready to publish
+✓ 200 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/publish publish E1 (11ms)
+  ✓ E1 is published
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/approval-bundle bundle E2 (9ms)
+✓ 403 POST /approval-requests/5fdc9bb8-eadb-4635-a9ce-8dc1332e82a2/decision unassigned faculty cannot decide (11ms)
+✓ 200 POST /approval-requests/905cb33a-cc63-45ed-84a3-120e5f1714b7/decision faculty requests changes on optional recording (14ms)
+✓ 200 POST /approval-requests/5fdc9bb8-eadb-4635-a9ce-8dc1332e82a2/decision E2 ORGANIZE (13ms)
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/approval-bundle bundle E2 (8ms)
+  ✓ E2 is ready to publish
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/publish publish E2 (8ms)
+  ✓ E2 is published
+✓ 200 GET /events/c4f30d5d-6552-448a-a370-75d6e3bac865/approval-bundle bundle E3 (8ms)
+✓ 200 POST /approval-requests/69c98a56-7569-4441-8ad4-c3bb4acd792d/decision E3 ORGANIZE (13ms)
+✓ 200 GET /events/c4f30d5d-6552-448a-a370-75d6e3bac865/approval-bundle bundle E3 (8ms)
+  ✓ E3 is ready to publish
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/publish publish E3 (8ms)
+  ✓ E3 is published
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (9ms)
+✓ 200 POST /approval-requests/df518bd4-cd8c-48d9-82ea-86b4dcaeaed4/escalate faculty escalates to HOD (13ms)
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (17ms)
+✓ 200 POST /approval-requests/df518bd4-cd8c-48d9-82ea-86b4dcaeaed4/escalate HOD escalates to Admin (12ms)
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (8ms)
+✓ 200 POST /approval-requests/df518bd4-cd8c-48d9-82ea-86b4dcaeaed4/decision Admin approves outside participation (15ms)
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (16ms)
+✓ 200 POST /approval-requests/86b846f5-4d68-4531-9225-b10f25ac0a2e/decision E4 ORGANIZE (17ms)
+✓ 200 GET /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/approval-bundle bundle E4 (8ms)
+  ✓ E4 is ready to publish
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/publish publish E4 (9ms)
+  ✓ E4 is published
+✓ 200 GET /events/a7477050-161a-4891-b47d-37cfa6a9b58a/approval-bundle bundle E5 (12ms)
+✓ 200 POST /approval-requests/6cd10e92-4f9b-4eff-8b7b-7702219ecff7/decision E5 INVITE_OUTSIDERS (13ms)
+✓ 200 POST /approval-requests/aba7f5de-f16f-455a-883f-0391ad03c8da/decision E5 ORGANIZE (12ms)
+✓ 200 GET /events/a7477050-161a-4891-b47d-37cfa6a9b58a/approval-bundle bundle E5 (8ms)
+  ✓ E5 is ready to publish
+✓ 200 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/publish publish E5 (8ms)
+  ✓ E5 is published
+✓ 200 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/start start E1 (7ms)
+  ✓ the drone lab is LIVE and open for scanning
+✓ 200 PATCH /quizzes/6604d833-d62e-49c9-b291-0e080f91b13b/status publish quiz E3 (9ms)
+  ✓ E3 quiz is published
+✓ 200 PATCH /quizzes/b84ec78a-9aff-4ef6-bdd4-dfe4f9326e25/status publish quiz E4 (9ms)
+  ✓ E4 quiz is published
+STEP 4 COMPLETE: approvals (incl. rejection, escalation to HOD and Admin) and publishing
+
+==================== STEP 5 ====================
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Aarav Sharma (61ms)
+  ✓ Aarav Sharma is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Diya Patel (16ms)
+  ✓ Diya Patel is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Reyansh Gupta (18ms)
+  ✓ Reyansh Gupta is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Ananya Singh (13ms)
+  ✓ Ananya Singh is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Vivaan Mehta (14ms)
+  ✓ Vivaan Mehta is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Isha Kapoor (14ms)
+  ✓ Isha Kapoor is confirmed for the drone lab
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 Arjun Rao (12ms)
+  ✓ Arjun Rao is confirmed for the drone lab
+✓ 404 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/register E1 outside student cannot even see the college-only event (9ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (8ms)
+  ✓ the phone lists the event title for an E1 registration
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/register E2 Aarav Sharma (20ms)
+  ✓ Aarav Sharma applied to the founders' table
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/register E2 Diya Patel (13ms)
+  ✓ Diya Patel applied to the founders' table
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/register E2 Reyansh Gupta (13ms)
+  ✓ Reyansh Gupta applied to the founders' table
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/register E2 Ananya Singh (14ms)
+  ✓ Ananya Singh applied to the founders' table
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/register E2 Vivaan Mehta (15ms)
+  ✓ Vivaan Mehta applied to the founders' table
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations?limit=50 E2 roster (23ms)
+  ✓ the manual roster shows all five applications
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations/5920b08f-8f83-44e0-8c85-4de74048b71b/decision E2 CONFIRMED Aarav Sharma (32ms)
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations/3304112b-4dad-4dd6-9291-45a9708303e5/decision E2 CONFIRMED Diya Patel (23ms)
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations/b220aad2-cd4a-45d2-96f0-1e12601c88a2/decision E2 CONFIRMED Reyansh Gupta (23ms)
+✓ 200 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations/3118a152-116b-461a-a4c3-65f24f3fedcc/decision E2 REJECTED Ananya Singh (26ms)
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/registrations?limit=50 E2 roster after (20ms)
+  ✓ manual decisions leave 3 confirmed, 1 applied and 1 rejected
+✓ 200 GET /me/registrations?limit=100 my registrations (7ms)
+  ✓ the rejected student sees the decision on their phone
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Naina Verma (13ms)
+  ✓ Naina Verma is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Dev Malhotra (16ms)
+  ✓ Dev Malhotra is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Sara Khan (14ms)
+  ✓ Sara Khan is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Yash Thakur (15ms)
+  ✓ Yash Thakur is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Mira Sen (14ms)
+  ✓ Mira Sen is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Aarav Sharma (20ms)
+  ✓ Aarav Sharma is confirmed for the webinar
+✓ 201 POST /events/a7477050-161a-4891-b47d-37cfa6a9b58a/register E5 Diya Patel (15ms)
+  ✓ Diya Patel is confirmed for the webinar
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Aarav Sharma (15ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Aarav Sharma (26ms)
+  ✓ Aarav Sharma received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 5/5 Aarav Sharma (21ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Diya Patel (18ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Diya Patel (21ms)
+  ✓ Diya Patel received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 5/5 Diya Patel (22ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Reyansh Gupta (15ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Reyansh Gupta (22ms)
+  ✓ Reyansh Gupta received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 5/5 Reyansh Gupta (45ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Ananya Singh (38ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Ananya Singh (26ms)
+  ✓ Ananya Singh received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 4/5 Ananya Singh (23ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Vivaan Mehta (15ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Vivaan Mehta (25ms)
+  ✓ Vivaan Mehta received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 3/5 Vivaan Mehta (26ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/register E3 Isha Kapoor (23ms)
+✓ 201 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts start quiz E3 Isha Kapoor (19ms)
+  ✓ Isha Kapoor received five questions
+✓ 200 POST /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz/attempts/submit submit 2/5 Isha Kapoor (23ms)
+✓ 200 PATCH /quizzes/6604d833-d62e-49c9-b291-0e080f91b13b/status close E3 quiz (12ms)
+✓ 200 POST /quizzes/6604d833-d62e-49c9-b291-0e080f91b13b/allocate allocate E3 seats (55ms)
+✓ 200 GET /events/c4f30d5d-6552-448a-a370-75d6e3bac865/quiz  (21ms)
+  ✓ E3 seats were allocated once
+✓ 200 GET /quizzes/6604d833-d62e-49c9-b291-0e080f91b13b/leaderboard?limit=20 E3 leaderboard (13ms)
+  ✓ leaderboard ranks all six submissions
+  ✓ leaderboard is ordered by score
+✓ 200 GET /me/registrations?limit=100 my registrations (12ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (15ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (11ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (16ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (9ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (9ms)
+  ✓ exactly three quiz winners are confirmed
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Naina Verma (19ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Naina Verma (26ms)
+  ✓ Naina Verma received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 5/5 Naina Verma (33ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Dev Malhotra (16ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Dev Malhotra (20ms)
+  ✓ Dev Malhotra received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 4/5 Dev Malhotra (27ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Sara Khan (19ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Sara Khan (27ms)
+  ✓ Sara Khan received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 3/5 Sara Khan (25ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Yash Thakur (16ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Yash Thakur (21ms)
+  ✓ Yash Thakur received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 3/5 Yash Thakur (25ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Mira Sen (17ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Mira Sen (21ms)
+  ✓ Mira Sen received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 2/5 Mira Sen (25ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Aarav Sharma (16ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Aarav Sharma (19ms)
+  ✓ Aarav Sharma received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 5/5 Aarav Sharma (22ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Diya Patel (17ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Diya Patel (17ms)
+  ✓ Diya Patel received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 4/5 Diya Patel (20ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Reyansh Gupta (12ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Reyansh Gupta (17ms)
+  ✓ Reyansh Gupta received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 3/5 Reyansh Gupta (27ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Ananya Singh (18ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Ananya Singh (17ms)
+  ✓ Ananya Singh received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 2/5 Ananya Singh (33ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/register E4 Vivaan Mehta (16ms)
+✓ 201 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts start quiz E4 Vivaan Mehta (22ms)
+  ✓ Vivaan Mehta received five questions
+✓ 200 POST /events/c9e8d7f7-12a7-4281-be2a-f09672b9b40e/quiz/attempts/submit submit 1/5 Vivaan Mehta (23ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (8ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (6ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (6ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (6ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (6ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (6ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (8ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (9ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (7ms)
+✓ 200 GET /me/registrations?limit=100 my registrations (7ms)
+  ✓ every qualifier above the pass score is confirmed
+STEP 5 COMPLETE: FCFS, manual decisions, quiz top-N and first-qualified admissions
+
+==================== STEP 6 ====================
+✓ 200 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/passes/issue issue E1 passes (66ms)
+✓ 200 GET /me/passes wallet Aarav Sharma (11ms)
+✓ 200 GET /me/passes wallet Diya Patel (13ms)
+✓ 200 GET /me/passes wallet Ananya Singh (8ms)
+  ✓ Aarav holds an E1 pass
+  ✓ the wallet starts with no checkpoints
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/checkpoints checkpoint Main gate (17ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/checkpoints checkpoint Workshop bay (16ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/checkpoints checkpoint Exit gate (10ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/checkpoints checkpoint Overflow gate (10ms)
+✓ 200 POST /me/passes/af184c4c-f3da-4c8c-8348-bdb1d155797f/nonce mint Aarav Sharma @ Main gate (16ms)
+✓ 200 POST /access/scan scan Aarav Sharma @ Main gate (15ms)
+  ✓ Aarav enters once
+✓ 200 POST /access/scan scan Aarav Sharma @ Main gate (11ms)
+  ✓ the same code cannot be used twice
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Main gate (7ms)
+✓ 200 POST /access/inspect inspect Diya's code (9ms)
+  ✓ inspect shows who the code belongs to
+✓ 200 POST /access/scan scan Diya Patel @ Main gate (9ms)
+  ✓ an identity mismatch is refused
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Main gate (8ms)
+✓ 200 POST /access/scan scan Diya Patel @ Main gate (15ms)
+  ✓ a fresh code works after a mismatch
+✓ 200 POST /me/passes/af184c4c-f3da-4c8c-8348-bdb1d155797f/nonce mint Aarav Sharma @ Exit gate (8ms)
+✓ 200 POST /access/scan scan Aarav Sharma @ Exit gate (11ms)
+  ✓ the exit gate toggles IN
+✓ 200 POST /me/passes/af184c4c-f3da-4c8c-8348-bdb1d155797f/nonce mint Aarav Sharma @ Exit gate (5ms)
+✓ 200 POST /access/scan scan Aarav Sharma @ Exit gate (11ms)
+  ✓ the exit gate toggles OUT
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Workshop bay (6ms)
+✓ 200 POST /access/scan scan Diya Patel @ Workshop bay (12ms)
+  ✓ workshop bay use 1 is granted
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Workshop bay (8ms)
+✓ 200 POST /access/scan scan Diya Patel @ Workshop bay (15ms)
+  ✓ workshop bay use 2 is granted
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Workshop bay (10ms)
+✓ 200 POST /access/scan scan Diya Patel @ Workshop bay (14ms)
+  ✓ the third bay scan is refused
+✓ 200 PATCH /access/checkpoints/98411bc7-834c-4c73-bdac-07adf00951d5/active switch overflow gate off (10ms)
+✓ 200 POST /me/passes/f5298393-2ec9-4385-b41f-5a629a20d971/nonce mint Diya Patel @ Overflow gate (8ms)
+✓ 200 POST /access/scan scan Diya Patel @ Overflow gate (11ms)
+  ✓ an inactive counter is refused
+✓ 200 PATCH /access/checkpoints/98411bc7-834c-4c73-bdac-07adf00951d5/active switch overflow gate on (10ms)
+✓ 201 POST /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/checkpoints checkpoint Seminar hall door (18ms)
+✓ 200 GET /events/9c31575b-770c-4c5c-9a9e-e632d3f0de24/checkpoints  (11ms)
+✓ 400 POST /me/passes/af184c4c-f3da-4c8c-8348-bdb1d155797f/nonce E1 pass cannot mint for the E2 door (7ms)
+✓ 403 POST /access/inspect outside student cannot use the scanner (6ms)
+✓ 200 POST /me/passes/af184c4c-f3da-4c8c-8348-bdb1d155797f/nonce mint Aarav Sharma @ Exit gate (8ms)
+✓ 200 POST /access/scans/sync sync one offline scan (16ms)
+  ✓ offline scan is accepted
+✓ 200 POST /access/scans/sync retry the same offline scan (8ms)
+  ✓ a retried offline scan is not counted twice
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/access-log?limit=100 access log (11ms)
+  ✓ the access log records every attempt
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/access-log?result=DENIED&limit=100 denied only (10ms)
+  ✓ the access log filters denials
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complaint-locations complaint location stage (14ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complaint-locations complaint location desk (12ms)
+  ✓ the printable poster downloads
+  ✓ the poster is a real PDF
+✓ 200 GET /complaints/locations/4c86345f-9b57-4b83-bd0e-20f0582d1fbd resolve complaint QR (7ms)
+  ✓ the QR resolves to its venue point
+✓ 201 POST /complaints/locations/4c86345f-9b57-4b83-bd0e-20f0582d1fbd/reports raise POWER complaint (12ms)
+✓ 201 POST /complaints/locations/4c86345f-9b57-4b83-bd0e-20f0582d1fbd/reports raise WIFI complaint (12ms)
+✓ 201 POST /complaints/locations/4c86345f-9b57-4b83-bd0e-20f0582d1fbd/reports raise EQUIPMENT complaint (11ms)
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complaints?limit=50 complaint list (16ms)
+  ✓ the organiser sees all three issues
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complaints/summary  (14ms)
+  ✓ three issues are open
+✓ 200 PATCH /complaints/f33260eb-8753-4ba8-a155-d9d9cc450428 acknowledge power issue (8ms)
+✓ 200 PATCH /complaints/e64a6c73-c207-4f1b-b1ab-9a160ffdbca0 assign wifi issue to coordinator (9ms)
+✓ 200 PATCH /complaints/218063e7-a9a1-474f-97a0-bc56ee14d86b resolve printer issue (10ms)
+✓ 200 GET /me/complaints?limit=20 my complaints (10ms)
+  ✓ the reporter sees the resolution
+✓ 404 PATCH /complaints/f33260eb-8753-4ba8-a155-d9d9cc450428 a student from another club cannot update complaints (7ms)
+✓ 404 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complaints outside student cannot list complaints (12ms)
+✓ 200 PATCH /complaints/locations/6a55b492-a045-4b03-be11-4f5a1506276c close the desk reporting point (11ms)
+✓ 409 POST /complaints/locations/6a55b492-a045-4b03-be11-4f5a1506276c/reports closed location refuses new reports (6ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/announcements post pinned announcement (27ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/announcements post safety announcement (24ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/announcements post lunch announcement (25ms)
+✓ 200 GET /me/announcements?limit=30 participant announcement feed (13ms)
+  ✓ the participant feed shows the announcements
+  ✓ pinned announcement sorts first
+✓ 200 POST /announcements/ea1ce946-e7dd-49d6-962e-f4047235ec20/revoke revoke lunch announcement (10ms)
+✓ 403 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/announcements non-organiser cannot post (16ms)
+STEP 6 COMPLETE: access QRs (replay, mismatch, counted, toggle, offline), complaints and announcements
+
+==================== STEP 7 ====================
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22  (54ms)
+waiting 239s for the workshop to finish...
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22  (34ms)
+  ✓ the workshop window has closed
+✓ 200 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/complete complete E1 (22ms)
+  ✓ the workshop is completed
+✓ 404 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/reports an uninvolved faculty member cannot generate reports (17ms)
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/reports reports before (17ms)
+✓ 201 POST /events/91b4238a-1853-4f83-bcf5-023c3b184e22/reports generate E1 report as club faculty (173ms)
+  ✓ a report exists for the completed workshop
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/reports/5766be1a-1e5d-4526-84f6-2ebdb8a282ce read filed report (15ms)
+  ✓ the filed checksum re-verifies
+  ✓ the report has a sequence number
+  ✓ the snapshot carries an integrity block
+  ✓ the snapshot pins the event
+  ✓ the report counts the seven confirmed participants
+  ✓ the report counts the access scans
+  ✓ the report counts the three complaints
+  ✓ the report records the resolved complaint
+  ✓ the report lists the announcements
+  ✓ the filed report PDF downloads
+  ✓ the report is a real PDF
+  ✓ the report PDF has real content
+✓ 200 GET /events/91b4238a-1853-4f83-bcf5-023c3b184e22/reports list reports (18ms)
+  ✓ the event lists its filed report
+STEP 7 COMPLETE: completed E1 and filed report 5766be1a-1e5d-4526-84f6-2ebdb8a282ce (10076 bytes) at docs/autonomous-drone-lab-report.pdf
+

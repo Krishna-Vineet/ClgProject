@@ -1,0 +1,49 @@
+# Render Blueprint for the CampusOps API. Database is Neon (external), not Render Postgres.
+# Validated against https://render.com/schema/render.yaml.json (runtime "node" + BUN_VERSION;
+# Render has no "bun" runtime value, and boolean env values must be quoted strings).
+services:
+  - type: web
+    name: campusops-api
+    runtime: node   # Render has no "bun" runtime; the Node image includes Bun via BUN_VERSION
+    plan: free
+    rootDir: .
+    buildCommand: bun install --frozen-lockfile
+    startCommand: bun run apps/api/src/index.ts
+    healthCheckPath: /health/live
+    envVars:
+      - key: BUN_VERSION
+        value: 1.4.4
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8787
+      - key: JOBS_ENABLED
+        value: "false"
+      - key: RATE_LIMIT_SCALE
+        value: 1
+      - key: DEMO_MODE
+        value: "false"
+      - key: EXPOSE_DEMO_OTP
+        value: "false"
+      - key: EMAIL_MODE
+        value: brevo
+      - key: STORAGE_MODE
+        value: s3
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      # Set these in the Render dashboard (sync:false = secret / manual):
+      - { key: DATABASE_URL, sync: false }
+      - { key: DATABASE_URL_POOLED, sync: false }
+      - { key: DATABASE_DIRECT_URL, sync: false }
+      - { key: JWT_ACCESS_SECRET, sync: false }
+      - { key: REFRESH_TOKEN_PEPPER, sync: false }
+      - { key: QR_SIGNING_SECRET, sync: false }
+      - { key: WEB_ORIGIN, sync: false }
+      - { key: APP_BASE_URL, sync: false }
+      - { key: EMAIL_FROM, sync: false }
+      - { key: BREVO_API_KEY, sync: false }
+      - { key: AWS_ENDPOINT_URL_S3, sync: false }
+      - { key: AWS_ACCESS_KEY_ID, sync: false }
+      - { key: AWS_SECRET_ACCESS_KEY, sync: false }
+      - { key: AWS_REGION, sync: false }
+      - { key: S3_BUCKET, sync: false }

@@ -1,0 +1,11 @@
+CampusOps source snapshot
+Branch: arena/0e9815ca-campusops
+Latest commit: dc0e0b69fdecf6d9128a7568413facde62a30eab
+Short SHA: dc0e0b6
+Commit subject: Make event control coordinator-only and clarify the event workspace
+Snapshot date: 2026-11-04T11:45:51Z
+
+Working tree is clean. The full .git directory is included so the complete
+commit history and the latest commit travel with this archive.
+node_modules and local .env files are intentionally excluded; use .env.example
+and the lockfile to restore dependencies.

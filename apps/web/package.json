@@ -1,0 +1,24 @@
+{
+  "name": "@campusops/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run vite --host 0.0.0.0",
+    "build": "bun run tsc --noEmit && bun run vite build",
+    "preview": "bun run vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@campusops/shared": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}

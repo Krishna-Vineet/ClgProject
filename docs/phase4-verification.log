@@ -1,0 +1,173 @@
+CampusOps — Phase 4 verification (management website)
+Date: 2026-10-31T19:37:42Z
+Bun 1.4.4 · PostgreSQL 17 · Chromium 156.0.8078.73 built on Debian GNU/Linux 13 (trixie)
+
+=== 1. lint ===
+Checked 136 files in 299ms. No fixes applied.
+
+=== 2. typecheck (shared / api / web) ===
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+=== 3. API + integration tests — three consecutive runs ===
+-- run 1 --
+@campusops/api test:  148 pass
+@campusops/api test:  0 fail
+@campusops/api test:  837 expect() calls
+@campusops/api test: Ran 148 tests across 15 files. [17.55s]
+-- run 2 --
+@campusops/api test:  148 pass
+@campusops/api test:  0 fail
+@campusops/api test:  837 expect() calls
+@campusops/api test: Ran 148 tests across 15 files. [17.61s]
+-- run 3 --
+@campusops/api test:  148 pass
+@campusops/api test:  0 fail
+@campusops/api test:  837 expect() calls
+@campusops/api test: Ran 148 tests across 15 files. [16.78s]
+
+=== 4. Phase 4 endpoint tests (departments, user detail, candidate search) ===
+(pass) departments directory > requires authentication [0.99ms]
+(pass) departments directory > any active account can read the list, including accounts with no role [5.78ms]
+(pass) departments directory > admin creates a department and the code is normalised to upper case [7.08ms]
+(pass) departments directory > a duplicate code is a conflict, not a silent second row [3.26ms]
+(pass) departments directory > an invalid code is rejected by validation [2.57ms]
+(pass) departments directory > HOD/Dean cannot create departments: structure is an admin power [1.99ms]
+(pass) departments directory > faculty cannot create departments [2.37ms]
+(pass) departments directory > admin renames a department [5.79ms]
+(pass) departments directory > HOD/Dean cannot rename departments [2.01ms]
+(pass) departments directory > an empty update is refused rather than writing a no-op audit row [2.45ms]
+(pass) departments directory > renaming an unknown department is a 404 [2.93ms]
+(pass) admin user detail > returns the roles and memberships the revoke UI needs [5.44ms]
+(pass) admin user detail > exposes a staff profile and assigned roles for staff [3.88ms]
+(pass) admin user detail > HOD/Dean cannot read arbitrary user detail [1.92ms]
+(pass) admin user detail > an unknown user is a 404 [2.49ms]
+(pass) club member candidate search > a club lead can search and finds an active college student [5.78ms]
+(pass) club member candidate search > outsiders and non-active accounts are never offered as members [4.76ms]
+(pass) club member candidate search > the faculty advisor may search too [4.65ms]
+(pass) club member candidate search > admin may search any club [4.25ms]
+(pass) club member candidate search > an unrelated account cannot enumerate the student body [2.70ms]
+(pass) club member candidate search > a one-character query is refused so the directory cannot be scraped cheaply [2.38ms]
+(pass) club member candidate search > the limit is capped [2.53ms]
+(pass) club member candidate search > an unknown club is a 404 [1.86ms]
+ 23 pass
+ 0 fail
+
+=== 5. web production build (role-split chunks, browser-safe shared entry) ===
+-- build 1 --
+dist/index.html                              1.02 kB │ gzip:  0.60 kB
+dist/assets/index-BpSkU8LT.css               6.82 kB │ gzip:  2.17 kB
+dist/assets/constants-D6HtWkBt.js            0.03 kB │ gzip:  0.05 kB
+dist/assets/roles-CrY9zLV2.js                0.38 kB │ gzip:  0.24 kB
+dist/assets/events-BDRXXUOn.js               1.11 kB │ gzip:  0.66 kB
+dist/assets/AccountPanel-Dmqcvx8E.js         3.81 kB │ gzip:  1.49 kB
+dist/assets/ApprovalsPanel-BvGFHkDP.js       5.64 kB │ gzip:  1.97 kB
+dist/assets/VerificationPanel-CNfYBhE9.js    7.07 kB │ gzip:  2.35 kB
+dist/assets/ClubsPanel-qcOJP7h2.js           9.99 kB │ gzip:  2.82 kB
+dist/assets/ReportsPanel-Do3lRpUT.js        10.19 kB │ gzip:  3.15 kB
+dist/assets/ResourcesPanel-CF_SmaSo.js      13.38 kB │ gzip:  3.89 kB
+dist/assets/AdminPanel-D8FAkZ8y.js          14.21 kB │ gzip:  3.98 kB
+dist/assets/CoordinatorPanel-Cr7sNjES.js    24.13 kB │ gzip:  6.92 kB
+dist/assets/index-CP3e9IRF.js              160.10 kB │ gzip: 52.30 kB
+✓ built in 992ms
+-- build 2 --
+dist/index.html                              1.02 kB │ gzip:  0.60 kB
+dist/assets/index-BpSkU8LT.css               6.82 kB │ gzip:  2.17 kB
+dist/assets/constants-D6HtWkBt.js            0.03 kB │ gzip:  0.05 kB
+dist/assets/roles-CrY9zLV2.js                0.38 kB │ gzip:  0.24 kB
+dist/assets/events-BDRXXUOn.js               1.11 kB │ gzip:  0.66 kB
+dist/assets/AccountPanel-Dmqcvx8E.js         3.81 kB │ gzip:  1.49 kB
+dist/assets/ApprovalsPanel-BvGFHkDP.js       5.64 kB │ gzip:  1.97 kB
+dist/assets/VerificationPanel-CNfYBhE9.js    7.07 kB │ gzip:  2.35 kB
+dist/assets/ClubsPanel-qcOJP7h2.js           9.99 kB │ gzip:  2.82 kB
+dist/assets/ReportsPanel-Do3lRpUT.js        10.19 kB │ gzip:  3.15 kB
+dist/assets/ResourcesPanel-CF_SmaSo.js      13.38 kB │ gzip:  3.89 kB
+dist/assets/AdminPanel-D8FAkZ8y.js          14.21 kB │ gzip:  3.98 kB
+dist/assets/CoordinatorPanel-Cr7sNjES.js    24.13 kB │ gzip:  6.92 kB
+dist/assets/index-CP3e9IRF.js              160.10 kB │ gzip: 52.30 kB
+✓ built in 1.11s
+Both builds are byte-identical in size: the split is reproducible.
+
+=== 6. schema check ===
+@campusops/api db:check: Exited with code 0
+
+=== 7. OpenAPI surface ===
+openapi 3.1.0 | paths 77 | operations 89
+
+=== 8. real-browser suites ===
+PASS  coordinator login — tabs: Events, Resources, Clubs, Reports, Account
+PASS  coordinator sees club events — 11 rows
+PASS  draft created through the UI
+PASS  faculty approver picker is populated — Demo Faculty CSE, Demo Faculty ECE
+PASS  only free units are offered for the event window — 4 available
+PASS  submission creates separate approval requests — 2 individual requests
+PASS  each request carries its own status — PENDING, PENDING
+PASS  publish blocked while required approvals are pending
+PASS  resource availability grid renders — 8 units
+PASS  faculty approval inbox — 4 pending
+PASS  request detail shows history — 1 actions
+PASS  faculty can escalate to HOD/Dean
+PASS  escalation submitted from the browser
+PASS  faculty approved a permission from the browser
+PASS  escalated request reached the HOD/Dean queue — tier HOD/Dean
+PASS  escalation preserved the faculty-tier history
+PASS  HOD/Dean can escalate one more tier to Admin
+PASS  HOD/Dean approved the escalated permission
+PASS  bundle now shows both permissions approved — APPROVED, APPROVED
+PASS  event published once every required approval was granted
+PASS  completed event is offered for reporting
+PASS  report generated in the browser with a checksum — 5d5212a1248e1943
+PASS  report shows organising club
+PASS  report shows approvals trail
+PASS  report shows faculty involvement
+PASS  report shows resources used
+PASS  report shows attendance
+PASS  report shows coordinator notes
+PASS  report shows QR check-in figure
+PASS  report PDF downloaded from the browser — 6103 bytes
+PASS  uninvolved faculty cannot read the report — HTTP 404
+PASS  a plain student is kept out of the management console — directed to the mobile app
+No browser console/page errors.
+32 passed, 0 failed
+PASS  no student self-registration on the website — students pointed at the mobile app
+PASS  staff auth modes offered
+PASS  bad credentials produce a visible error — Invalid email or password.
+PASS  admin navigation — Approvals, Resources, Clubs, Reports, Administration, Account
+PASS  admin reaches administration
+PASS  user directory renders — 11 rows
+PASS  user search filters the directory — 1 match
+PASS  user detail exposes club memberships
+PASS  user detail leaks no password material
+PASS  department created through the UI — E2E551922
+PASS  department renamed through the UI
+PASS  duplicate department code is refused in the UI
+PASS  maintenance shows outbox counters — Queued notifications, Failed notifications
+PASS  maintenance job triggered from the UI
+PASS  coordinator cannot see administration — Events, Resources, Clubs, Reports, Account
+PASS  club list renders — 6 rows
+PASS  club creation is withheld from a club lead
+PASS  club created through the UI — E2E Club 1793475551922
+PASS  member candidate search returns accounts
+PASS  coordinator added to the club from the UI
+PASS  draft created for event operations
+PASS  draft editor exposes the eligibility policy
+PASS  draft edited and saved with an eligibility policy
+PASS  invitations recorded through the UI — 2 addresses
+PASS  destructive action opens a real modal dialog
+PASS  invitation revoked through the UI
+PASS  event history shows revisions and audit
+PASS  start is blocked for an unapproved draft
+PASS  HOD/Dean sees the resource catalogue
+PASS  HOD/Dean may manage resources in scope
+PASS  resource created with its bookable units
+PASS  resource unit retired through the UI
+PASS  booking calendar renders for the window
+PASS  HOD/Dean reviews verification without deciding or seeing ID documents
+PASS  faculty verification queue renders — queue visible
+PASS  faculty can decide a student verification
+PASS  account panel shows the signed-in roles
+PASS  password change is blocked while confirmation differs
+PASS  no horizontal page overflow at 420px — 0px
+No browser console/page errors.
+39 passed, 0 failed

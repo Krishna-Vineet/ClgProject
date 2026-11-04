@@ -1,0 +1,39 @@
+# Phase 5 verification run (2026-11-01)
+
+## API tests
+@campusops/api test:  1956 expect() calls
+@campusops/api test: Ran 254 tests across 19 files. [29.91s]
+
+## Web e2e
+No browser console/page errors.
+25 passed, 0 failed
+No browser console/page errors.
+32 passed, 0 failed
+No browser console/page errors.
+39 passed, 0 failed
+
+## Mobile e2e
+PASS  outsider registration is separate and does not ask for faculty verification fields
+
+12 pass, 0 fail; console/page errors: 0
+
+## Expo
+Dependencies are up to date
+17/17 checks passed. No issues detected!
+
+## Native exports
+/tmp/p5-mobile-android-export.log:Android Bundled 19398ms apps/mobile/index.ts (780 modules)
+/tmp/p5-mobile-android-export.log:Exported: dist
+/tmp/p5-mobile-ios-export.log:iOS Bundled 17822ms apps/mobile/index.ts (781 modules)
+/tmp/p5-mobile-ios-export.log:Exported: dist
+/tmp/p5-mobile-export-final.log:Web Bundled 329ms apps/mobile/index.ts (176 modules)
+/tmp/p5-mobile-export-final.log:Exported: dist
+
+## Web build
+@campusops/web build: dist/assets/index-pKcqWpyo.js              160.69 kB │ gzip: 52.45 kB
+@campusops/web build: ✓ built in 2.13s
+@campusops/web build: Exited with code 0
+deterministic: identical hashes across two builds
+
+## DB
+45 tables, migrations 0001-0007, dev reset + seed idempotent

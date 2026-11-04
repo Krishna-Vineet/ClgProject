@@ -1,0 +1,10 @@
+process.env.NODE_ENV = "test";
+process.env.JWT_ACCESS_SECRET ??= "test-access-secret-0123456789-0123456789";
+process.env.REFRESH_TOKEN_PEPPER ??= "test-refresh-pepper-0123456789-0123456789";
+process.env.TEST_DATABASE_URL ??= "postgresql://campusops:campusops@127.0.0.1:55432/campusops_test";
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+process.env.APP_BASE_URL = "http://localhost:5173";
+process.env.DEMO_MODE = "true";
+process.env.EMAIL_MODE = "demo";
+process.env.EXPOSE_DEMO_OTP = "true";
+process.env.STORAGE_MODE = "disabled";

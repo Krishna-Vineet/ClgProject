@@ -1,0 +1,83 @@
+# Phase 1 verification log
+
+## typecheck
+$ bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+## lint
+$ biome check .
+Checked 45 files in 35ms. No fixes applied.
+
+## api tests
+@campusops/api test: bun test v1.4.4 (38afee6c8)
+@campusops/api test: 
+@campusops/api test: tests/health.test.ts:
+@campusops/api test: (pass) health routes > live does not require database [2.81ms]
+@campusops/api test: (pass) health routes > unknown route returns stable error [0.71ms]
+@campusops/api test: 
+@campusops/api test: tests/roles.test.ts:
+@campusops/api test: (pass) role categories > HOD/Dean is one category [0.05ms]
+@campusops/api test: (pass) role categories > approval tier mapping [0.03ms]
+@campusops/api test: 
+@campusops/api test: tests/env.test.ts:
+@campusops/api test: (pass) env validation > defaults are safe [0.13ms]
+@campusops/api test: (pass) env validation > empty strings become undefined [0.15ms]
+@campusops/api test: (pass) env validation > invalid port fails [0.41ms]
+@campusops/api test: 
+@campusops/api test: tests/constraints.integration.test.ts:
+@campusops/api test: (pass) database constraints > overlapping active reservation for same resource unit is rejected [13.85ms]
+@campusops/api test: (pass) database constraints > adjacent reservation is allowed and then cleaned up [2.83ms]
+@campusops/api test: (pass) database constraints > duplicate event registration is rejected [1.02ms]
+@campusops/api test: (pass) database constraints > seed can be repeated without duplicating demo users [0.54ms]
+@campusops/api test: 
+@campusops/api test: tests/db.integration.test.ts:
+@campusops/api test: (pass) database integration > global_role enum uses HOD_DEAN only [6.35ms]
+@campusops/api test: (pass) database integration > resource reservation exclusion constraint exists [0.76ms]
+@campusops/api test: (pass) database integration > seed is idempotent and demo data exists [1.16ms]
+@campusops/api test: 
+@campusops/api test:  14 pass
+@campusops/api test:  0 fail
+@campusops/api test:  33 expect() calls
+@campusops/api test: Ran 14 tests across 5 files. [81.00ms]
+@campusops/api test: Exited with code 0
+
+## mobile typecheck
+@campusops/mobile typecheck: Exited with code 0
+
+## web build
+@campusops/web build: vite v6.4.5 building for production...
+@campusops/web build: transforming...
+@campusops/web build: ✓ 45 modules transformed.
+@campusops/web build: rendering chunks...
+@campusops/web build: computing gzip size...
+@campusops/web build: dist/index.html                   0.41 kB │ gzip:  0.28 kB
+@campusops/web build: dist/assets/index-uSna1VGH.css    0.53 kB │ gzip:  0.33 kB
+@campusops/web build: dist/assets/index-COb7yLg4.js   200.86 kB │ gzip: 59.63 kB
+@campusops/web build: ✓ built in 1.04s
+@campusops/web build: Exited with code 0
+
+## db check (dev)
+$ bun run --filter @campusops/api db:check
+@campusops/api db:check: {
+@campusops/api db:check:   "version": "PostgreSQL 17.11 (Debian 17.11-0+deb13u1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+@campusops/api db:check:   "publicTables": 40,
+@campusops/api db:check:   "migrations": [
+@campusops/api db:check:     "0001_init.sql"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "resourceExclusionConstraints": [
+@campusops/api db:check:     "resource_reservations_resource_unit_id_tstzrange_excl"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "globalRoles": [
+@campusops/api db:check:     "ADMIN",
+@campusops/api db:check:     "FACULTY",
+@campusops/api db:check:     "HOD_DEAN",
+@campusops/api db:check:     "SUPPORT"
+@campusops/api db:check:   ]
+@campusops/api db:check: }
+@campusops/api db:check: Exited with code 0
+
+## health
+{"data":{"status":"ok","service":"campusops-api","phase":1,"timestamp":"2026-10-29T19:06:38.286Z","checks":{"database":"ok"}},"requestId":"17878080-a32c-446f-9bc6-ab253a44ca21"}
+{"data":{"status":"ok","service":"campusops-api","phase":1,"timestamp":"2026-10-29T19:06:38.295Z","checks":{"database":"ok"}},"requestId":"fb3152f4-4f07-4f7d-bb17-524b8746090f"}

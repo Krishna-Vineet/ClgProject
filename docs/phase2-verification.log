@@ -1,0 +1,96 @@
+CampusOps Phase 2 verification — 2026-10-30T03:51:28Z
+
+$ bun run lint
+$ biome check .
+Checked 72 files in 94ms. No fixes applied.
+
+$ bun run typecheck
+$ bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+$ bun run --filter @campusops/mobile typecheck
+@campusops/mobile typecheck: Exited with code 0
+
+$ TEST_DATABASE_URL=postgresql://campusops:campusops@127.0.0.1:55432/campusops_test bun run test
+$ bun run --filter @campusops/api test
+@campusops/api test: bun test v1.4.4 (38afee6c8)
+@campusops/api test: 
+@campusops/api test: tests/health.test.ts:
+@campusops/api test: (pass) health routes > live does not require database [7.10ms]
+@campusops/api test: (pass) health routes > unknown route returns stable error [1.72ms]
+@campusops/api test: 
+@campusops/api test: tests/roles.test.ts:
+@campusops/api test: (pass) role categories > HOD/Dean is one category [0.04ms]
+@campusops/api test: (pass) role categories > approval tier mapping [0.05ms]
+@campusops/api test: 
+@campusops/api test: tests/env.test.ts:
+@campusops/api test: (pass) env validation > defaults are safe [0.25ms]
+@campusops/api test: (pass) env validation > empty strings become undefined [0.31ms]
+@campusops/api test: (pass) env validation > invalid port fails [0.61ms]
+@campusops/api test: 
+@campusops/api test: tests/phase2.integration.test.ts:
+@campusops/api test: [dev-email] to=phase2.college.1793332298286@test.campusops.local subject=Verify your CampusOps email url=http://localhost:5173/verify-email?token=h1OWYpVZ5bxVxMxDtMFY7UcltIFLrJcBlDte47Dh6SM
+@campusops/api test: (pass) phase 2 auth and permissions > college registration requires email verification then faculty verification [409.06ms]
+@campusops/api test: [dev-email] to=phase2.outsider.1793332298286@test.campusops.local subject=Verify your CampusOps email url=http://localhost:5173/verify-email?token=nkv2fmY_sQ7S6Z0LrFxWj6z8bZM5M2AC2lnbz03vdjU
+@campusops/api test: [dev-email] to=phase2.invited.1793332298286@test.campusops.local subject=Verify your CampusOps email url=http://localhost:5173/verify-email?token=FWxzrF8iNY3iosMNETN6wnzz6fQW28g0xUN4g5BKVXI
+@campusops/api test: (pass) phase 2 auth and permissions > outsider self-verifies but cannot see college-only events; invited-only works by invitation [807.74ms]
+@campusops/api test: (pass) phase 2 auth and permissions > club scope blocks cross-club coordinator access [22.58ms]
+@campusops/api test: (pass) phase 2 auth and permissions > refresh rotation invalidates the old refresh token [7.13ms]
+@campusops/api test: [dev-email] to=phase2.staff.1793332298286@test.campusops.local subject=Set up your CampusOps staff account url=http://localhost:5173/staff-setup?token=kv2JAhvoSLQ8kEYzpMryYCJN6DLMY6d89pvOimCu2D2RO_asTWUXBpvfDotCyY3S
+@campusops/api test: (pass) phase 2 auth and permissions > admin provisions staff, assigns roles, suspends and reactivates [400.31ms]
+@campusops/api test: [dev-email] to=phase2.outsider.1793332298286@test.campusops.local subject=Reset your CampusOps password url=http://localhost:5173/reset-password?token=TM3ps86fvZUpfN7uMxzXlLOXgXxZHfVJr-e_dFsSJq8
+@campusops/api test: (pass) phase 2 auth and permissions > password reset and change revoke sessions; faculty can correct profiles [1295.68ms]
+@campusops/api test: (pass) phase 2 auth and permissions > web refresh works with httpOnly cookie and no JSON body [185.77ms]
+@campusops/api test: (pass) phase 2 auth and permissions > identity and role actions are audited without secrets [1.13ms]
+@campusops/api test: 
+@campusops/api test: tests/constraints.integration.test.ts:
+@campusops/api test: (pass) database constraints > overlapping active reservation for same resource unit is rejected [9.20ms]
+@campusops/api test: (pass) database constraints > adjacent reservation is allowed and then cleaned up [2.65ms]
+@campusops/api test: (pass) database constraints > duplicate event registration is rejected [0.96ms]
+@campusops/api test: (pass) database constraints > seed can be repeated without duplicating demo users [0.66ms]
+@campusops/api test: 
+@campusops/api test: tests/db.integration.test.ts:
+@campusops/api test: (pass) database integration > global_role enum uses HOD_DEAN only [7.19ms]
+@campusops/api test: (pass) database integration > resource reservation exclusion constraint exists [0.73ms]
+@campusops/api test: (pass) database integration > seed is idempotent and demo data exists [1.24ms]
+@campusops/api test: 
+@campusops/api test:  22 pass
+@campusops/api test:  0 fail
+@campusops/api test:  104 expect() calls
+@campusops/api test: Ran 22 tests across 6 files. [4.47s]
+@campusops/api test: Exited with code 0
+
+$ bun run --filter @campusops/web build
+@campusops/web build: vite v6.4.5 building for production...
+@campusops/web build: transforming...
+@campusops/web build: ✓ 45 modules transformed.
+@campusops/web build: rendering chunks...
+@campusops/web build: computing gzip size...
+@campusops/web build: dist/index.html                   0.41 kB │ gzip:  0.28 kB
+@campusops/web build: dist/assets/index-uSna1VGH.css    0.53 kB │ gzip:  0.33 kB
+@campusops/web build: dist/assets/index-pXZSxAE5.js   200.92 kB │ gzip: 59.67 kB
+@campusops/web build: ✓ built in 1.10s
+@campusops/web build: Exited with code 0
+
+$ DATABASE_URL=postgresql://campusops:campusops@127.0.0.1:55432/campusops_dev bun run db:check
+$ bun run --filter @campusops/api db:check
+@campusops/api db:check: {
+@campusops/api db:check:   "version": "PostgreSQL 17.11 (Debian 17.11-0+deb13u1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+@campusops/api db:check:   "publicTables": 41,
+@campusops/api db:check:   "migrations": [
+@campusops/api db:check:     "0001_init.sql",
+@campusops/api db:check:     "0002_auth_and_hardening.sql"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "resourceExclusionConstraints": [
+@campusops/api db:check:     "resource_reservations_resource_unit_id_tstzrange_excl"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "globalRoles": [
+@campusops/api db:check:     "ADMIN",
+@campusops/api db:check:     "FACULTY",
+@campusops/api db:check:     "HOD_DEAN",
+@campusops/api db:check:     "SUPPORT"
+@campusops/api db:check:   ]
+@campusops/api db:check: }
+@campusops/api db:check: Exited with code 0

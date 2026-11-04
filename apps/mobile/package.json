@@ -1,0 +1,45 @@
+{
+  "name": "@campusops/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "bun x expo start --lan",
+    "android": "bun x expo start --android",
+    "ios": "bun x expo start --ios",
+    "web": "bun x expo start --web --port 8081",
+    "build:web": "bun x expo export --platform web",
+    "check:versions": "bun x expo install --check",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@campusops/shared": "workspace:*",
+    "@expo/metro-runtime": "58.0.16",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "58.0.22",
+    "expo-camera": "58.0.14",
+    "expo-constants": "58.0.14",
+    "expo-device": "58.0.5",
+    "expo-document-picker": "~58.0.4",
+    "expo-linking": "58.0.15",
+    "expo-network": "58.0.4",
+    "expo-notifications": "58.1.7",
+    "expo-secure-store": "58.0.2",
+    "expo-status-bar": "58.0.4",
+    "qrcode-generator": "2.0.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.10.1",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "0.21.4"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "babel-preset-expo": "58.0.22",
+    "typescript": "6.0.3"
+  }
+}

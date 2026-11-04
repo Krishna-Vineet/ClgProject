@@ -1,0 +1,119 @@
+CampusOps — Phase 4.5 verification log
+Scope correction (access QRs, complaints, club faculty) + hardening
+Run on 2026-11-01, Bun 1.4.4, PostgreSQL 17.11, sandbox Linux.
+
+Every gate below was run AFTER the last code change. Commands are the ones the
+user can re-run after exporting the repo and filling in .env.
+
+=== 1. Lint ===
+$ bun run lint
+Checked 151 files. No fixes applied. 0 errors.
+
+=== 2. Typecheck (all three workspaces) ===
+$ bun run typecheck
+@campusops/shared typecheck: Exited with code 0
+@campusops/api    typecheck: Exited with code 0
+@campusops/web    typecheck: Exited with code 0
+
+=== 3. Database ===
+$ bun run db:migrate      # campusops_dev and campusops_test
+0001_init.sql .. 0006_access_qr_and_club_faculty.sql applied; migrations complete.
+$ bun run db:seed         # both databases
+seed complete (idempotent)   — run twice, no duplicates
+$ bun run db:check
+Exited with code 0
+
+Migration 0006 was amended twice during this round (scan_logs.event_id, and
+dropping the legacy one-redemption-per-checkpoint constraint). Both databases
+were therefore recreated from scratch and migrated 0001→0006 so that the files
+and the live schema are identical. No migration was edited after being applied
+to a database that was kept.
+
+=== 4. Tests ===
+$ bun run test
+224 pass / 0 fail / 1787 expect() calls / 18 files.
+
+New files this round (only the corrected code is tested, per instruction):
+  tests/access-rules.test.ts          20 tests — pure access rules + QR codec
+  tests/access.integration.test.ts    34 tests — HTTP + real DB
+  tests/complaints.integration.test.ts 21 tests — HTTP + real DB + PDF bytes
+
+Previously-passing suites were NOT rewritten. Four existing assertions were
+updated because the approved scope change made them obsolete:
+  - demo user count 11 → 10 (the separate scanning-staff account was removed)
+    in constraints.integration.test.ts and db.integration.test.ts
+  - HOD/Dean may now manage clubs in their own department
+    (phase2.integration.test.ts: 403 → 200, plus a NEW 403 assertion for a club
+     in another department, so the test is stronger than before)
+  - "the faculty advisor may search too" → "club faculty help run events but do
+    not manage the club team" (phase4.integration.test.ts: 200 → 403)
+Two constraint tests stopped asserting on driver message text and now assert
+the PostgreSQL condition code, which survives driver/ORM upgrades.
+
+=== 5. Web production build ===
+$ bun run build:web   (twice, byte-identical)
+dist/assets/index-CHWYRLWT.js   160.69 kB │ gzip: 52.45 kB
+AccessQrPanel   ~26 kB │ gzip 4.6 kB   (lazy)
+ComplaintsPanel ~22 kB │ gzip 3.6 kB   (lazy)
+
+Build output is now independent of the ambient NODE_ENV:
+  NODE_ENV=production  → index-Cq0Abu7d.js 160.67 kB
+  NODE_ENV=development → index-Cq0Abu7d.js 160.67 kB   (same hash)
+  NODE_ENV unset       → index-Cq0Abu7d.js 160.67 kB   (same hash)
+Before the fix, sourcing .env.local (NODE_ENV=development) produced a React
+DEVELOPMENT bundle at 356.46 kB / gzip 106.98 kB with a successful exit code.
+(The 160.69 vs 160.67 difference between sections 5 and the NODE_ENV matrix is
+the seed/demo copy added after that comparison; both are repeatable.)
+
+=== 6. OpenAPI contract ===
+$ curl -s /api/v1/openapi.json
+OpenAPI 3.1.0 — 93 paths, 110 operations (was 77 / 89).
+New tags: Access (11 operations), Complaints (10 operations).
+tests/openapi.test.ts asserts every mounted route is documented and every
+documented operation is mounted, so the 21 new operations cannot drift.
+
+=== 7. Browser end-to-end (real Chromium) ===
+$ bun run e2e:all
+  e2e/access-complaints.mjs   24 passed, 0 failed   (new this round)
+  e2e/portal.mjs              32 passed, 0 failed
+  e2e/management.mjs          39 passed, 0 failed
+  Total 95 checks. No browser console or page errors in any suite.
+  Horizontal page overflow at 420px: 0px.
+
+Artifacts: e2e/p45-01-access.png, p45-02-complaint-points.png,
+p45-03-club-faculty.png, p45-04-narrow.png,
+e2e/downloads/report-issue-*.pdf (the downloaded complaint poster).
+
+The downloaded poster was also checked outside the browser:
+$ pdftotext e2e/downloads/report-issue-*.pdf -
+  CAMPUSOPS / Report an issue here / Scan this code in the CampusOps app
+  <location label> / <where exactly>
+  Intro to Git Workshop / Demo Coding Club / 8 Nov 2026, 2:30 pm
+  Your report goes only to the coordinators of this event.
+  Location reference 898307A9
+
+=== 8. Dependency audit ===
+$ bun audit   (before)
+6 vulnerabilities: 3 high, 2 moderate, 1 low
+$ bun audit   (after)
+4 vulnerabilities: 1 high, 2 moderate, 1 low
+
+Fixed:
+  drizzle-orm 0.38.4 → 0.45.4   HIGH CVE-2026-39356 (SQL identifier injection)
+  playwright  1.49.1 → 1.64.1   HIGH GHSA-7mvr-c777-76hp (browser download TLS)
+Also updated within range: hono 4.13.16, @aws-sdk/* 3.1161.0,
+zod-to-json-schema 3.25.2. All gates re-run after the upgrades.
+
+Remaining, with reasoning in phase4.5-audit.md:
+  zod 3.25.76 (high, CVE-2023-54404) — patched only in Zod 4.6.6. The actual
+    vector (unbounded array schemas) has been closed in our code; see audit.
+  deepmerge / glob / minimatch — transitive under apps/mobile > expo. They are
+    build-time tooling for the mobile app, which is the next phase.
+
+=== 9. Not exercised, and not claimed ===
+- S3 and Brevo with real credentials. STORAGE_MODE and EMAIL_MODE still run in
+  demo mode here; the user supplies real values.
+- Render / Vercel / Neon deployment itself.
+- A physical QR scan from a phone camera. The QR payload is verified
+  module-by-module against the encoder in a test, and the scan API is verified
+  end-to-end over HTTP, but no camera has read a printed poster yet.

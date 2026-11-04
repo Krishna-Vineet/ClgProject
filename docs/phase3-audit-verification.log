@@ -1,0 +1,223 @@
+CampusOps — Phase 3 audit + post-event reports verification
+Generated: 2026-10-30T16:13:07Z
+Bun: 1.4.4  |  PostgreSQL: 17.11 (Debian 17.11-0+deb13u1)
+
+==================== 1. LINT ====================
+$ biome check .
+Checked 121 files in 279ms. No fixes applied.
+
+==================== 2. TYPECHECK ====================
+@campusops/shared typecheck: Exited with code 0
+@campusops/api typecheck: Exited with code 0
+@campusops/web typecheck: Exited with code 0
+
+==================== 3. TEST SUITE ====================
+@campusops/api test: (pass) event reports > a report captures permissions, club, coordinators, faculty and attendees [206.07ms]
+@campusops/api test: (pass) event reports > the submitting coordinator is not misreported as faculty involved [8.57ms]
+@campusops/api test: (pass) event reports > the issued PDF is a real, readable multi-section document [24.52ms]
+@campusops/api test: (pass) event reports > regenerating creates a new numbered version and never edits the old one [56.24ms]
+@campusops/api test: (pass) event reports > the database refuses to rewrite an issued report [7.03ms]
+@campusops/api test: (pass) event reports > access is institutional, not open to any faculty or other departments [35.26ms]
+@campusops/api test: (pass) event reports > a report cannot be issued before the event finishes [36.13ms]
+@campusops/api test: (pass) event reports > preview shows the same facts without filing a record [26.72ms]
+@campusops/api test: (pass) event reports > counts stay exact when the attendee list is capped [472.49ms]
+@campusops/api test: (pass) event reports > storage being disabled is stated, not silently faked [45.80ms]
+@campusops/api test: (pass) health routes > live does not require database [7.55ms]
+@campusops/api test: (pass) health routes > unknown route returns stable error [10.30ms]
+@campusops/api test: (pass) role categories > HOD/Dean is one category [0.09ms]
+@campusops/api test: (pass) role categories > approval tier mapping [0.05ms]
+@campusops/api test: (pass) env validation > defaults are safe [0.75ms]
+@campusops/api test: (pass) env validation > empty strings become undefined [0.34ms]
+@campusops/api test: (pass) env validation > invalid port fails [0.53ms]
+@campusops/api test: (pass) web request payloads match the API schemas > approval decisions use the decisionSchema field names [0.90ms]
+@campusops/api test: (pass) web request payloads match the API schemas > escalation always names the next tier explicitly [0.34ms]
+@campusops/api test: (pass) web request payloads match the API schemas > reassignment uses assigneeId and a reason [0.20ms]
+@campusops/api test: (pass) web request payloads match the API schemas > inbox scope values are the ones the API accepts [0.38ms]
+@campusops/api test: (pass) web request payloads match the API schemas > coordinator submission matches submitEventSchema [0.36ms]
+@campusops/api test: (pass) web request payloads match the API schemas > the draft form only offers admission modes the API accepts today [0.39ms]
+@campusops/api test: (pass) web request payloads match the API schemas > the client never hardcodes a backend host [0.59ms]
+@campusops/api test: (pass) API contract > validation errors are stable and do not leak internals [1.74ms]
+@campusops/api test: (pass) API contract > protected routes require auth and unknown routes are stable [0.32ms]
+@campusops/api test: (pass) API contract > list endpoints expose bounded pagination metadata [445.54ms]
+@campusops/api test: (pass) API contract > hidden records return 404, not 403, to outsiders [370.90ms]
+@campusops/api test: (pass) API contract > file presign rejects event-scoped purposes until Phase 3 authorization exists [364.87ms]
+@campusops/api test: (pass) phase 2 auth and permissions > college registration requires email verification then faculty verification [398.24ms]
+@campusops/api test: (pass) phase 2 auth and permissions > outsider self-verifies but cannot see college-only events; invited-only works by invitation [752.48ms]
+@campusops/api test: (pass) phase 2 auth and permissions > club scope blocks cross-club coordinator access [20.50ms]
+@campusops/api test: (pass) phase 2 auth and permissions > refresh rotation invalidates the old refresh token [8.63ms]
+@campusops/api test: (pass) phase 2 auth and permissions > admin provisions staff, assigns roles, suspends and reactivates [391.20ms]
+@campusops/api test: (pass) phase 2 auth and permissions > password reset and change revoke sessions; faculty can correct profiles [1271.45ms]
+@campusops/api test: (pass) phase 2 auth and permissions > web refresh works with httpOnly cookie and no JSON body [169.89ms]
+@campusops/api test: (pass) phase 2 auth and permissions > identity and role actions are audited without secrets [1.19ms]
+@campusops/api test: (pass) database constraints > overlapping active reservation for same resource unit is rejected [13.72ms]
+@campusops/api test: (pass) database constraints > adjacent reservation is allowed and then cleaned up [3.95ms]
+@campusops/api test: (pass) database constraints > duplicate event registration is rejected [1.25ms]
+@campusops/api test: (pass) database constraints > seed can be repeated without duplicating demo users [1.16ms]
+@campusops/api test: (pass) phase 3 events > coordinator creates a draft; non-member cannot create in that club [19.65ms]
+@campusops/api test: (pass) phase 3 events > draft edits are revision-guarded and window-validated [24.95ms]
+@campusops/api test: (pass) phase 3 events > submit freezes a revision and creates individual requests with holds [46.02ms]
+@campusops/api test: (pass) phase 3 events > overlapping resource request for the same unit fails with RESOURCE_CONFLICT [26.86ms]
+@campusops/api test: (pass) phase 3 events > adjacent window on the same unit is allowed [39.41ms]
+@campusops/api test: (pass) phase 3 events > publish is blocked while required approvals are pending [9.63ms]
+@campusops/api test: (pass) phase 3 events > only the assigned faculty can decide; stale versions are rejected [32.73ms]
+@campusops/api test: (pass) phase 3 events > approving a resource request confirms its hold [10.01ms]
+@campusops/api test: (pass) phase 3 events > optional request rejection does not block publishing [17.18ms]
+@campusops/api test: (pass) phase 3 events > rejection requires an explanatory comment [8.64ms]
+@campusops/api test: (pass) phase 3 escalation > faculty escalates to senior, senior to admin, history is preserved [74.98ms]
+@campusops/api test: (pass) phase 3 escalation > admin tier cannot escalate further [45.36ms]
+@campusops/api test: (pass) phase 3 escalation > admin reassignment keeps an audit trail and notifies the new assignee [39.64ms]
+@campusops/api test: (pass) phase 3 escalation > inbox is scoped to the approver's own authority [11.03ms]
+@campusops/api test: (pass) phase 3 revisions and cancellation > critical change after publish creates a new draft revision and keeps history [14.07ms]
+@campusops/api test: (pass) phase 3 revisions and cancellation > re-submitting supersedes the old bundle and releases its holds [19.55ms]
+@campusops/api test: (pass) phase 3 revisions and cancellation > cancel releases holds and closes pending requests [34.40ms]
+@campusops/api test: (pass) phase 3 revisions and cancellation > withdrawing a resource request releases only its own holds [27.24ms]
+@campusops/api test: (pass) phase 3 resources > inventory management is admin/HOD-scoped, coordinators read only [8.70ms]
+@campusops/api test: (pass) phase 3 resources > availability reports busy blocks without leaking other events [9.28ms]
+@campusops/api test: (pass) phase 3 resources > a unit with upcoming bookings cannot be retired silently [3.86ms]
+@campusops/api test: (pass) phase 3 resources > maintenance units cannot be requested [26.57ms]
+@campusops/api test: (pass) phase 3 resources > calendar window is bounded [14.91ms]
+@campusops/api test: (pass) phase 3 invitations and eligibility > invitations are idempotent per email and revocable [19.11ms]
+@campusops/api test: (pass) phase 3 invitations and eligibility > eligibility preview explains restrictions [8.75ms]
+@campusops/api test: (pass) phase 3 concurrency > 20 parallel submissions for one unit produce exactly one active hold [279.60ms]
+@campusops/api test: (pass) phase 3 concurrency > parallel decisions on one request produce exactly one effective decision [53.47ms]
+@campusops/api test: (pass) phase 3 jobs > expired holds are released and the request is sent back for changes [40.08ms]
+@campusops/api test: (pass) phase 3 jobs > outbox rows are queued in the business transaction and dispatched after commit [63.09ms]
+@campusops/api test: (pass) phase 3 jobs > maintenance endpoint is admin-only [52.96ms]
+@campusops/api test: (pass) phase 3 audit history and account context > event audit history is scoped, append-only and redacted [46.42ms]
+@campusops/api test: (pass) phase 3 audit history and account context > /me exposes the roles and memberships the portal needs [7.51ms]
+@campusops/api test: (pass) phase 3 audit history and account context > quiz-ranked admission is refused until quizzes exist [14.15ms]
+@campusops/api test: (pass) time ranges > adjacent bookings do not overlap (half-open ranges) [0.12ms]
+@campusops/api test: (pass) time ranges > containment respects setup/teardown windows [0.05ms]
+@campusops/api test: (pass) time ranges > merge collapses overlapping and touching blocks [0.08ms]
+@campusops/api test: (pass) eligibility evaluator > empty policy allows any account [0.02ms]
+@campusops/api test: (pass) eligibility evaluator > account type restriction is enforced [0.03ms]
+@campusops/api test: (pass) eligibility evaluator > department and batch restrictions accumulate reasons [0.03ms]
+@campusops/api test: (pass) eligibility evaluator > invitation requirement is separate from audience [0.02ms]
+@campusops/api test: (pass) approval authority and routing > faculty tier requires the named assignee [0.03ms]
+@campusops/api test: (pass) approval authority and routing > admin cannot silently decide a faculty-tier request [0.02ms]
+@campusops/api test: (pass) approval authority and routing > unassigned senior queue is department scoped [0.03ms]
+@campusops/api test: (pass) approval authority and routing > escalation only moves one tier forward and stops at admin [0.02ms]
+@campusops/api test: (pass) bundle summary > optional rejection does not block publishing [0.06ms]
+@campusops/api test: (pass) bundle summary > required pending blocks publishing [0.03ms]
+@campusops/api test: (pass) bundle summary > required rejection is a failure, not just pending [0.03ms]
+@campusops/api test: (pass) bundle summary > an empty bundle is never publishable [0.01ms]
+@campusops/api test: (pass) bundle summary > composition requires one organize and outsider permission [0.05ms]
+@campusops/api test: (pass) admission modes > quiz-ranked admission is refused until a quiz is attached [0.04ms]
+@campusops/api test: (pass) admission modes > a linked quiz unlocks both quiz seat-allocation modes [0.06ms]
+@campusops/api test: (pass) admission modes > audience never restricts admission ranking [0.03ms]
+@campusops/api test: (pass) event lifecycle > legal transitions only [0.03ms]
+@campusops/api test: (pass) event lifecycle > critical field detection ignores cosmetic edits [0.04ms]
+@campusops/api test: (pass) event lifecycle > window validation mirrors DB checks [0.08ms]
+@campusops/api test: (pass) event lifecycle > publish gate demands approvals and live holds [0.05ms]
+@campusops/api test: (pass) resource holds > conflicts ignore the event's own reservations and released rows [0.14ms]
+@campusops/api test: (pass) resource holds > only HELD reservations expire [0.05ms]
+@campusops/api test: (pass) resource holds > decision maps to reservation state [0.07ms]
+@campusops/api test: (pass) phase 2 close-out hardening > demo toggles are explicit and production-safe [1.25ms]
+@campusops/api test: (pass) phase 2 close-out hardening > OTP wrong attempts are limited and demo OTP is not logged as a token [231.66ms]
+@campusops/api test: (pass) phase 2 close-out hardening > registration idempotency replays the same response and rejects changed payload [192.53ms]
+@campusops/api test: (pass) phase 2 close-out hardening > private storage is disabled explicitly, not silently mocked [364.48ms]
+@campusops/api test: (pass) audit: publish must not leave a resource merely HELD > publishing confirms every reservation it validated [42.66ms]
+@campusops/api test: (pass) audit: attachments after approval must not bypass re-approval > resources cannot be attached to an already-approved request [31.05ms]
+@campusops/api test: (pass) audit: adding a required approval re-locks a READY event > a READY event returns to PENDING_APPROVALS when a required request is added [61.20ms]
+@campusops/api test: (pass) audit: completed and cancelled events release everything > cancelling a published event releases confirmed reservations [57.54ms]
+@campusops/api test: (pass) audit: outsiders cannot see college-only events > a college-only published event is invisible to an outsider account [445.28ms]
+@campusops/api test: (pass) audit: the event report contract is not a lie > completeEvent does not accept a field it silently discards [51.88ms]
+@campusops/api test: (pass) audit: documented contracts match runtime behaviour > OpenAPI advertises the pagination style the routes actually accept [0.52ms]
+@campusops/api test: (pass) audit: documented contracts match runtime behaviour > event banners can actually be presigned, since events require that purpose [1.85ms]
+@campusops/api test: (pass) audit: documented contracts match runtime behaviour > server-generated report purposes are refused for direct upload [1.73ms]
+@campusops/api test: (pass) audit: documented contracts match runtime behaviour > operational caps come from configuration, not literals [0.19ms]
+@campusops/api test: (pass) database integration > global_role enum uses HOD_DEAN only [8.40ms]
+@campusops/api test: (pass) database integration > resource reservation exclusion constraint exists [0.96ms]
+@campusops/api test: (pass) database integration > seed is idempotent and demo data exists [1.50ms]
+@campusops/api test: (pass) OpenAPI contract > every mounted API route is documented [0.39ms]
+@campusops/api test: (pass) OpenAPI contract > every documented operation is actually mounted [0.26ms]
+@campusops/api test: (pass) OpenAPI contract > spec is valid OpenAPI 3.1 with unique operation ids [0.13ms]
+@campusops/api test: (pass) OpenAPI contract > path parameters are declared for every templated path [0.26ms]
+@campusops/api test: (pass) OpenAPI contract > request bodies are real JSON Schema, not placeholders [0.13ms]
+@campusops/api test: (pass) OpenAPI contract > protected operations declare bearer auth and public ones do not [0.15ms]
+@campusops/api test: (pass) OpenAPI contract > the served document matches the generated one [3.48ms]
+@campusops/api test: (pass) OpenAPI contract > approval and event mutations document optimistic concurrency [0.57ms]
+@campusops/api test:  125 pass
+@campusops/api test:  0 fail
+@campusops/api test:  785 expect() calls
+@campusops/api test: Ran 125 tests across 14 files. [16.78s]
+
+==================== 4. WEB BUILD ====================
+@campusops/web build: dist/index.html                   1.02 kB │ gzip:   0.60 kB
+@campusops/web build: dist/assets/index-DdMTSLiW.css    4.64 kB │ gzip:   1.58 kB
+@campusops/web build: dist/assets/index-BjlsWY2R.js   480.11 kB │ gzip: 127.90 kB
+@campusops/web build: ✓ built in 2.44s
+@campusops/web build: Exited with code 0
+
+==================== 5. BROWSER WALKTHROUGH ====================
+PASS  coordinator login — tabs: My events, Reports, Resources, Account
+PASS  coordinator sees club events — 21 rows
+PASS  draft created through the UI
+PASS  faculty approver picker is populated — Demo Faculty CSE, Demo Faculty ECE
+PASS  only free units are offered for the event window — 4 available
+PASS  submission creates separate approval requests — 2 individual requests
+PASS  each request carries its own status — PENDING, PENDING
+PASS  publish blocked while required approvals are pending
+PASS  resource availability grid renders — 4 units
+PASS  faculty approval inbox — 4 pending
+PASS  request detail shows history — 1 actions
+PASS  faculty can escalate to HOD/Dean
+PASS  escalation submitted from the browser
+PASS  faculty approved a permission from the browser
+PASS  escalated request reached the HOD/Dean queue — tier HOD/Dean
+PASS  escalation preserved the faculty-tier history
+PASS  HOD/Dean can escalate one more tier to Admin
+PASS  HOD/Dean approved the escalated permission
+PASS  bundle now shows both permissions approved — APPROVED, APPROVED
+PASS  event published once every required approval was granted
+PASS  completed event is offered for reporting
+PASS  report generated in the browser with a checksum — 76dc0af782e9cb5f
+PASS  report shows organising club
+PASS  report shows approvals trail
+PASS  report shows faculty involvement
+PASS  report shows resources used
+PASS  report shows attendance
+PASS  report shows coordinator notes
+PASS  report shows QR check-in figure
+PASS  report PDF downloaded from the browser — 6089 bytes
+PASS  uninvolved faculty cannot read the report — HTTP 404
+PASS  student sees no coordinator or approval tooling — Resources, Account
+
+No browser console/page errors.
+
+32 passed, 0 failed
+
+==================== 6. API CONTRACT ====================
+{"data":{"status":"ok","service":"campusops-api","phase":3,"timestamp":"2026-10-30T16:14:24.695Z","checks":{"database":"ok"}},"requestId":"4708232d-197d-41de-8021-6e9631ecd91a"}
+OpenAPI 3.1.0 | paths: 73 | operations: 84
+Report paths: /events/{id}/reports, /events/{id}/report-preview, /events/{id}/reports/{reportId}, /events/{id}/reports/{reportId}/pdf
+Unknown route status: 404
+
+==================== 7. FRESH DATABASE FROM ZERO ====================
+@campusops/api db:migrate: applied 0001_init.sql
+@campusops/api db:migrate: applied 0002_auth_and_hardening.sql
+@campusops/api db:migrate: applied 0003_phase2_closeout.sql
+@campusops/api db:migrate: applied 0004_phase3_events_approvals_resources.sql
+@campusops/api db:migrate: applied 0005_event_reports.sql
+@campusops/api db:migrate: migrations complete
+@campusops/api db:seed: seed complete (idempotent)
+-- second seed run (idempotency) --
+@campusops/api db:seed: seed complete (idempotent)
+
+-- structural guarantees --
+@campusops/api db:check:   "auditAppendOnlyTriggers": [
+@campusops/api db:check:     "audit_logs_no_delete",
+@campusops/api db:check:     "audit_logs_no_update"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "reportAppendOnlyTriggers": [
+@campusops/api db:check:     "event_reports_no_update"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "reportSequenceUnique": [
+@campusops/api db:check:     "event_reports_event_sequence_unique"
+@campusops/api db:check:   ],
+@campusops/api db:check:   "reservationStates": [
+@campusops/api db:check:     {
+
+==================== 8. ENUM PARITY (PostgreSQL vs Drizzle) ====================
+PostgreSQL enums: 30 | Drizzle enums: 30
+DRIFT: none — exact match

@@ -30,23 +30,19 @@ type ResourceEdit = { unitId: string; startsAt: string; endsAt: string };
 const PRESETS: Array<{
   type: RequestDraft["type"];
   label: string;
-  hint: string;
 }> = [
-  { type: "ORGANIZE", label: "Organize event", hint: "The club's standing permission to run it." },
+  { type: "ORGANIZE", label: "Organize event", },
   {
     type: "INVITE_OUTSIDERS",
     label: "Invite outsiders",
-    hint: "Only needed when people from outside the college attend.",
   },
   {
     type: "RESOURCE_USE",
     label: "Book a resource",
-    hint: "A room, lab or equipment hold for the event window.",
   },
   {
     type: "CUSTOM",
     label: "Custom permission",
-    hint: "Anything else that needs a named sign-off.",
   },
 ];
 
@@ -297,11 +293,7 @@ export function EventApprovals({
                   className="preset"
                   onClick={() => addDraft(preset.type)}
                 >
-                  <Icon name="plus" size={14} />
-                  <span>
                     <strong>{preset.label}</strong>
-                    <small>{preset.hint}</small>
-                  </span>
                 </button>
               ))}
             </div>

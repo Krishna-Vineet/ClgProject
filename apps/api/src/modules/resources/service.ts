@@ -62,6 +62,29 @@ function assertTargetDepartmentScope(auth: AuthContext, departmentId: string | n
     throw new ApiError("FORBIDDEN", "Target department is outside your scope.");
 }
 
+/**
+ * Is this reservation still allowed to block its window?
+ *
+ * A HELD row whose hold_expires_at has passed is *not* a hold any more — the
+ * reservation writes it out as RELEASED, so a hold that expired between two job
+ * runs is nobody's reservation. The calendar and the availability lookup used to
+ * treat every HELD row as blocking until a background sweep rewrote it, which is
+ * why a resource could look permanently taken by an approval that had already
+ * timed out. Releasing is a background concern; *reporting* it is not.
+ */
+function isStillBlocking(
+  reservation: { status: string; holdExpiresAt: Date | null },
+  now: Date,
+): boolean {
+  if (
+    reservation.status === "HELD" &&
+    reservation.holdExpiresAt &&
+    reservation.holdExpiresAt <= now
+  )
+    return false;
+  return reservation.status === "HELD" || reservation.status === "CONFIRMED";
+}
+
 export async function listResources(
   auth: AuthContext,
   input: z.infer<typeof resourceListQuerySchema>,
@@ -381,10 +404,13 @@ export async function availability(input: {
           ),
         )
     : [];
+  const now = new Date();
   return {
     window,
     items: pageRows.map(({ unit, resource }) => {
-      const busy = reservations.filter((r) => r.resourceUnitId === unit.id);
+      const busy = reservations.filter(
+        (r) => r.resourceUnitId === unit.id && isStillBlocking(r, now),
+      );
       const bookable = unit.status === "ACTIVE" && resource.status === "ACTIVE";
       return {
         resourceUnitId: unit.id,
@@ -460,6 +486,7 @@ export async function calendar(
 
   const myClubIds = new Set(auth.memberships.map((m) => m.clubId));
   const senior = departmentScope(auth, "HOD_DEAN");
+  const now = new Date();
   return {
     window: { startsAt: input.startsAt, endsAt: input.endsAt },
     rows: units.map(({ unit, resource }) => ({
@@ -470,7 +497,9 @@ export async function calendar(
       resourceStatus: resource.status,
       capacity: resource.capacity,
       bookings: rows
-        .filter((r) => r.reservation.resourceUnitId === unit.id)
+        .filter(
+          (r) => r.reservation.resourceUnitId === unit.id && isStillBlocking(r.reservation, now),
+        )
         .map((r) => {
           const canSeeDetail =
             hasRole(auth, "ADMIN") ||

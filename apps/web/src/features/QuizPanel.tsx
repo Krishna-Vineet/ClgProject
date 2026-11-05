@@ -409,94 +409,139 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
             Shuffle question order for each participant
           </label>
 
+          {/* The quiz screen is often the first place people look for "who can
+              register". Answer the question with a pointer, once, instead of
+              offering a second copy of the rules that can drift from the event's. */}
+          <p className="quiz-eligibility-note">
+            Who may register for this quiz is the event&apos;s own rule —{" "}
+            <strong>{event.admissionMode.startsWith("QUIZ") ? "quiz entry" : "event entry"}</strong>{" "}
+            uses the same audience and eligibility settings as everything else. Change them in{" "}
+            <strong>Edit details → Who may register</strong>; nothing is configured separately for
+            the quiz.
+          </p>
+
           <h4 style={{ marginTop: 16 }}>
             Questions · {questions.length} · {totalPoints} points
           </h4>
-          {questions.map((q, index) => (
-            // Questions have no stable id before saving; the index is the identity here.
-            // biome-ignore lint/suspicious/noArrayIndexKey: draft questions are identified by position
-            <div className="sub-form" key={index}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <strong>Question {index + 1}</strong>
-                <button
-                  type="button"
-                  className="ghost"
-                  disabled={questions.length === 1}
-                  onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== index))}
-                >
-                  Remove
-                </button>
-              </div>
-              <Field label="Prompt">
-                <textarea
-                  rows={2}
-                  value={q.prompt}
-                  maxLength={1000}
-                  onChange={(e) => updateQuestion(index, { prompt: e.target.value })}
-                />
-              </Field>
-              {q.options.map((opt, oi) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: options are identified by position
-                <div className="row" key={oi} style={{ alignItems: "center", gap: 8 }}>
-                  <input
-                    type="radio"
-                    name={`correct-${index}`}
-                    checked={q.correctOptionIndex === oi}
-                    onChange={() => updateQuestion(index, { correctOptionIndex: oi })}
-                    aria-label={`Mark option ${oi + 1} correct for question ${index + 1}`}
-                  />
-                  <input
-                    style={{ flex: 1 }}
-                    value={opt}
-                    maxLength={300}
-                    placeholder={`Option ${oi + 1}`}
-                    onChange={(e) =>
-                      updateQuestion(index, {
-                        options: q.options.map((o, i) => (i === oi ? e.target.value : o)),
-                      })
-                    }
-                  />
+          <ol className="question-list">
+            {questions.map((q, index) => (
+              // Questions have no stable id before saving; the index is the identity here.
+              // biome-ignore lint/suspicious/noArrayIndexKey: draft questions are identified by position
+              <li className="question-card" key={index}>
+                <header className="question-head">
+                  <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="question-points">
+                    {q.points} {Number(q.points) === 1 ? "point" : "points"}
+                  </span>
                   <button
                     type="button"
-                    className="ghost"
-                    disabled={q.options.length <= 2}
-                    onClick={() =>
-                      updateQuestion(index, {
-                        options: q.options.filter((_, i) => i !== oi),
-                        correctOptionIndex:
-                          q.correctOptionIndex >= oi && q.correctOptionIndex > 0
-                            ? q.correctOptionIndex - 1
-                            : q.correctOptionIndex,
-                      })
-                    }
+                    className="ghost tiny"
+                    disabled={questions.length === 1}
+                    onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== index))}
                   >
-                    ×
+                    Remove
                   </button>
-                </div>
-              ))}
-              <div className="row" style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="ghost"
-                  disabled={q.options.length >= 6}
-                  onClick={() => updateQuestion(index, { options: [...q.options, ""] })}
-                >
-                  Add option
-                </button>
-                <Field label="Points">
-                  <input
-                    type="number"
-                    min={0.25}
-                    max={100}
-                    step={0.25}
-                    value={q.points}
-                    onChange={(e) => updateQuestion(index, { points: Number(e.target.value) })}
+                </header>
+
+                <label className="question-prompt">
+                  <span>Question {index + 1}</span>
+                  <textarea
+                    rows={2}
+                    value={q.prompt}
+                    maxLength={1000}
+                    placeholder="What should the participant answer?"
+                    onChange={(e) => updateQuestion(index, { prompt: e.target.value })}
                   />
-                </Field>
-              </div>
-              <p className="meta">Select the radio button beside the correct answer.</p>
-            </div>
-          ))}
+                </label>
+
+                <div
+                  className="option-list"
+                  role="radiogroup"
+                  aria-label={`Options for question ${index + 1}`}
+                >
+                  {q.options.map((opt, oi) => {
+                    const correct = q.correctOptionIndex === oi;
+                    return (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: options are identified by position
+                      <div className={correct ? "option-row is-correct" : "option-row"} key={oi}>
+                        {/* One control per option that both picks the right answer and
+                            says what it is doing. The old radio had no visible link to
+                            the field beside it, so "which one is the answer?" was a
+                            guess. */}
+                        {/* A real radio: the browser gives us arrow-key navigation,
+                            one-of-many semantics and form behaviour for free, and the
+                            letter is the label so "which option is the answer?" needs
+                            no guessing. */}
+                        <label className={correct ? "option-mark active" : "option-mark"}>
+                          <input
+                            type="radio"
+                            name={`correct-option-${index}`}
+                            checked={correct}
+                            onChange={() => updateQuestion(index, { correctOptionIndex: oi })}
+                          />
+                          <span>{String.fromCharCode(65 + oi)}</span>
+                          <span className="sr-only">
+                            Mark option {String.fromCharCode(65 + oi)} as the correct answer
+                          </span>
+                        </label>
+                        <input
+                          className="option-text"
+                          value={opt}
+                          maxLength={300}
+                          placeholder={`Option ${String.fromCharCode(65 + oi)}`}
+                          onChange={(e) =>
+                            updateQuestion(index, {
+                              options: q.options.map((o, i) => (i === oi ? e.target.value : o)),
+                            })
+                          }
+                        />
+                        {correct ? <span className="option-correct-tag">Correct</span> : null}
+                        <button
+                          type="button"
+                          className="ghost tiny"
+                          aria-label={`Remove option ${String.fromCharCode(65 + oi)}`}
+                          disabled={q.options.length <= 2}
+                          onClick={() =>
+                            updateQuestion(index, {
+                              options: q.options.filter((_, i) => i !== oi),
+                              correctOptionIndex:
+                                q.correctOptionIndex >= oi && q.correctOptionIndex > 0
+                                  ? q.correctOptionIndex - 1
+                                  : q.correctOptionIndex,
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <footer className="question-foot">
+                  <button
+                    type="button"
+                    className="ghost tiny"
+                    disabled={q.options.length >= 6}
+                    onClick={() => updateQuestion(index, { options: [...q.options, ""] })}
+                  >
+                    Add option
+                  </button>
+                  <label className="question-points-input">
+                    <span>Points</span>
+                    <input
+                      type="number"
+                      min={0.25}
+                      max={100}
+                      step={0.25}
+                      value={q.points}
+                      onChange={(e) => updateQuestion(index, { points: Number(e.target.value) })}
+                    />
+                  </label>
+                </footer>
+              </li>
+            ))}
+          </ol>
           <div className="row" style={{ marginTop: 12 }}>
             <button
               type="button"
@@ -529,24 +574,27 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
                 : "Attempts have started, so the paper is locked."}
             {!canSeeKey ? " The answer key is hidden for reviewers." : ""}
           </p>
-          <ol className="plain">
+          <ol className="paper-view">
             {questions.map((q, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: read-only list
-              <li key={i} style={{ marginBottom: 10 }}>
-                <strong>{q.prompt}</strong>
-                <ul className="plain meta">
-                  {q.options.map((o, oi) => (
-                    <li
-                      key={`${i}-${oi}-${o}`}
-                      style={{
-                        color: canSeeKey && oi === q.correctOptionIndex ? "var(--good)" : undefined,
-                      }}
-                    >
-                      {canSeeKey && oi === q.correctOptionIndex ? "✓ " : ""}
-                      {o}
-                    </li>
-                  ))}
-                </ul>
+              <li key={i}>
+                <p className="paper-q">
+                  <span className="paper-num">Q{i + 1}</span>
+                  {q.prompt}
+                  <span className="paper-pts">{q.points}</span>
+                </p>
+                <ol className="paper-options">
+                  {q.options.map((o, oi) => {
+                    const correct = canSeeKey && oi === q.correctOptionIndex;
+                    return (
+                      <li key={`${i}-${oi}-${o}`} className={correct ? "is-answer" : undefined}>
+                        <span className="paper-letter">{String.fromCharCode(65 + oi)}</span>
+                        {o}
+                        {correct ? <span className="paper-answer-tag">Answer</span> : null}
+                      </li>
+                    );
+                  })}
+                </ol>
               </li>
             ))}
           </ol>

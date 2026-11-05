@@ -312,16 +312,18 @@ maybe("phase 2 auth and permissions", () => {
     expect(roboticsOwn.status).toBe(200);
     const seniorRead = await req("GET", `/api/v1/clubs/${U(40)}`, undefined, seniorToken);
     expect(seniorRead.status).toBe(200);
-    // HOD/Dean now manage clubs in their own department: the seeded senior is
-    // HOD/Dean of the coding club's department, so this is allowed...
+    // A club's identity is an institution-level fact, so editing the club itself
+    // is Admin-only. An HOD/Dean still reads every club (seniorRead above) and
+    // runs the events of clubs in their department — but they cannot rename or
+    // re-describe one. This previously allowed the department HOD to PATCH their
+    // own department's club; a club edit is now a single, predictable rule.
     const seniorManage = await req(
       "PATCH",
       `/api/v1/clubs/${U(40)}`,
       { description: "Reviewed by the department." },
       seniorToken,
     );
-    expect(seniorManage.status).toBe(200);
-    // ...but the robotics club sits in another department and stays out of reach.
+    expect(seniorManage.status).toBe(403);
     const seniorElsewhere = await req(
       "PATCH",
       `/api/v1/clubs/${U(41)}`,

@@ -2,6 +2,12 @@ import { DEFAULT_CAMPUS_TIMEZONE, DEFAULT_QR_TTL_SECONDS } from "@campusops/shar
 import { z } from "zod";
 
 const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
+// A trailing newline from `echo >> .env`, or "S3" instead of "s3", is the same
+// intention written differently. Trimming and lower-casing here means a value
+// that only differs by whitespace or case still turns storage on, while a value
+// that is actually wrong is still rejected with the name of the variable.
+const enumFromEnv = <T extends readonly [string, ...string[]]>(values: T) =>
+  z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : v), z.enum(values));
 const boolFromEnv = (defaultValue: boolean) =>
   z.preprocess((v) => {
     if (v === "" || v === undefined) return defaultValue;
@@ -86,7 +92,7 @@ const envSchema = z
     EMAIL_PROVIDER_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
 
     // Private object storage. Disabled is explicit; s3 requires the full variable group.
-    STORAGE_MODE: z.enum(["disabled", "s3"]).default("disabled"),
+    STORAGE_MODE: enumFromEnv(["disabled", "s3"]).default("disabled"),
     AWS_ENDPOINT_URL_S3: z.preprocess(emptyToUndefined, z.string().url().optional()),
     AWS_ACCESS_KEY_ID: z.preprocess(emptyToUndefined, z.string().optional()),
     AWS_SECRET_ACCESS_KEY: z.preprocess(emptyToUndefined, z.string().optional()),

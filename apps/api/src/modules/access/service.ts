@@ -7,6 +7,7 @@ import {
   standingFor,
 } from "@campusops/shared";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { env } from "../../config/env";
 import { getDb } from "../../db/client";
@@ -40,6 +41,9 @@ import type {
  * its club faculty. There is no separate scanning-staff account. Oversight is
  * read-only, so Admin and HOD/Dean do not scan either.
  */
+// Two joins to `users` in one query: the scanner and the participant.
+const participantUser = alias(users, "participant_user");
+
 export function assertMayScan(auth: AuthContext, clubId: string) {
   if (isClubOrganiser(auth, clubId)) return;
   throw new ApiError(
@@ -391,13 +395,21 @@ export async function accessLog(eventId: string, page: z.infer<typeof accessLogQ
       log: scanLogs,
       scanner: { id: users.id, fullName: users.fullName },
       checkpointName: checkpoints.name,
-      participant: { id: registrations.userId },
+      // Name and phone, not just an id: a gate log is read to answer "who came
+      // through, and how do I reach them", and an opaque id answers neither.
+      participant: {
+        id: registrations.userId,
+        fullName: participantUser.fullName,
+        phone: participantUser.phone,
+        email: participantUser.email,
+      },
     })
     .from(scanLogs)
     .innerJoin(users, eq(users.id, scanLogs.scannerId))
     .leftJoin(checkpoints, eq(checkpoints.id, scanLogs.checkpointId))
     .leftJoin(passes, eq(passes.id, scanLogs.passId))
     .leftJoin(registrations, eq(registrations.id, passes.registrationId))
+    .leftJoin(participantUser, eq(participantUser.id, registrations.userId))
     .where(and(...filters))
     .orderBy(desc(scanLogs.createdAt), desc(scanLogs.id))
     .limit(page.limit + 1)
@@ -411,6 +423,9 @@ export async function accessLog(eventId: string, page: z.infer<typeof accessLogQ
         scanner: r.scanner,
         checkpointName: r.checkpointName,
         participantId: r.participant?.id ?? null,
+        participantName: r.participant?.fullName ?? null,
+        participantPhone: r.participant?.phone ?? null,
+        participantEmail: r.participant?.email ?? null,
       };
     }),
     limit: page.limit,

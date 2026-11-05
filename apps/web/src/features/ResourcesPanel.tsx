@@ -268,11 +268,17 @@ function CalendarView() {
         title="Resource calendar"
         actions={
           <div className="row">
-            <button type="button" className="ghost tiny" onClick={() => shiftWeek(-1)}>
+            <button
+              type="button"
+              id="calendar-prev-week"
+              className="ghost tiny"
+              onClick={() => shiftWeek(-1)}
+            >
               ← Previous
             </button>
             <button
               type="button"
+              id="calendar-this-week"
               className="ghost tiny"
               onClick={() => {
                 setTip(null);
@@ -281,7 +287,12 @@ function CalendarView() {
             >
               This week
             </button>
-            <button type="button" className="ghost tiny" onClick={() => shiftWeek(1)}>
+            <button
+              type="button"
+              id="calendar-next-week"
+              className="ghost tiny"
+              onClick={() => shiftWeek(1)}
+            >
               Next →
             </button>
           </div>
@@ -714,7 +725,7 @@ function Catalogue({ mayManage }: { mayManage: boolean }) {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} data-resource-id={r.id}>
                     <td>{r.name}</td>
                     <td className="meta">{deptName(r.departmentId)}</td>
                     <td>{r.units.length}</td>
@@ -722,7 +733,13 @@ function Catalogue({ mayManage }: { mayManage: boolean }) {
                       <span className="chip">{RESOURCE_STATUS_LABELS[r.status]}</span>
                     </td>
                     <td>
-                      <button type="button" className="ghost tiny" onClick={() => openResource(r)}>
+                      <button
+                        type="button"
+                        id={`resource-open-${r.id}`}
+                        className="ghost tiny"
+                        aria-label={`Open ${r.name}`}
+                        onClick={() => openResource(r)}
+                      >
                         Open
                       </button>
                     </td>
@@ -867,7 +884,7 @@ function Catalogue({ mayManage }: { mayManage: boolean }) {
                   </thead>
                   <tbody>
                     {selected.units.map((u) => (
-                      <tr key={u.id}>
+                      <tr key={u.id} data-unit-id={u.id}>
                         <td>{u.label}</td>
                         <td>
                           <span className="chip">{RESOURCE_STATUS_LABELS[u.status]}</span>
@@ -878,7 +895,9 @@ function Catalogue({ mayManage }: { mayManage: boolean }) {
                             {u.status !== "RETIRED" && (
                               <button
                                 type="button"
+                                id={`unit-retire-${u.id}`}
                                 className="ghost tiny"
+                                aria-label={`Retire ${u.label}`}
                                 onClick={() => setRetire(u)}
                               >
                                 Retire

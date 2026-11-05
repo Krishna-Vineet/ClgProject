@@ -6,6 +6,7 @@ import {
   EVENT_TEMPLATES,
   EVENT_TEMPLATE_LABELS,
   type EventAudience,
+  defaultEligibilityPolicy,
 } from "@campusops/shared/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormDialog, Pager, useToast } from "../components/feedback";
@@ -26,6 +27,12 @@ import { type Page, api, downloadBlob, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
 import { useSession } from "../lib/session";
 import type { Approver, AvailabilityItem, ClubRow, EventBundle, EventRow } from "../lib/types";
+import {
+  type Audience,
+  EligibilityBuilder,
+  type EligibilityPolicy,
+  parseYears,
+} from "./EligibilityBuilder";
 import { EventApprovals } from "./EventApprovals";
 import { EventWorkspace, type EventWorkspaceTab } from "./EventWorkspace";
 
@@ -42,6 +49,7 @@ type DraftForm = {
   registrationOpensAt: string;
   registrationClosesAt: string;
   venueSummary: string;
+  policy: EligibilityPolicy;
 };
 
 function defaultForm(clubId: string): DraftForm {
@@ -65,6 +73,7 @@ function defaultForm(clubId: string): DraftForm {
     registrationOpensAt: toLocalInput(opens),
     registrationClosesAt: toLocalInput(start),
     venueSummary: "",
+    policy: { ...defaultEligibilityPolicy },
   };
 }
 
@@ -111,6 +120,12 @@ export function CoordinatorPanel({
   const [approvers, setApprovers] = useState<Approver[]>([]);
   const [units, setUnits] = useState<AvailabilityItem[]>([]);
   const [form, setForm] = useState<DraftForm | null>(null);
+  // The raw year text lives here, not in the policy: the user is typing a string
+  // and re-parsing it into the input on every keystroke moves the cursor.
+  const [yearsText, setYearsText] = useState("");
+  const [departments, setDepartments] = useState<Array<{ id: string; code: string; name: string }>>(
+    [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -209,6 +224,14 @@ export function CoordinatorPanel({
     return () => clearTimeout(timer);
   }, [loadEvents]);
 
+  // Departments are only needed by the "who may register" builder, and they never
+  // change mid-session. One fetch, no spinner.
+  useEffect(() => {
+    api<{ items: Array<{ id: string; code: string; name: string }> }>("/departments")
+      .then((r) => setDepartments(r.items))
+      .catch(() => setDepartments([]));
+  }, []);
+
   // Deep links from the dashboard / global search open a specific event once.
   useEffect(() => {
     if (focusEventId) {
@@ -244,6 +267,9 @@ export function CoordinatorPanel({
         registrationOpensAt: fromLocalInput(form.registrationOpensAt),
         registrationClosesAt: fromLocalInput(form.registrationClosesAt),
         venueSummary: form.venueSummary || null,
+        // Created with the rules the organiser chose, not with "everyone" and a
+        // second trip through Edit details.
+        eligibilityPolicy: form.policy,
       });
       setForm(null);
       setNotice("Draft created. Add the permissions it needs, then submit.");
@@ -808,32 +834,42 @@ export function CoordinatorPanel({
             ))}
           </select>
         </Field>
-        <Field label="Audience">
-          <select
-            value={form?.audience ?? ""}
-            onChange={(e) =>
-              setForm((f) => (f ? { ...f, audience: e.target.value as EventAudience } : f))
-            }
-          >
-            <option value="COLLEGE_ONLY">College only</option>
-            <option value="OUTSIDERS_ALLOWED">Outsiders allowed</option>
-            <option value="INVITED_ONLY">Invited only</option>
-          </select>
-        </Field>
+        {/* Audience and registration access are one question, answered once, with
+            the same component the event workspace uses. "Admission" was a third
+            control here that looked like a fourth kind of access rule; it is how
+            seats are allocated, which is a different question, so it stays — but
+            it now says so. */}
+        <EligibilityBuilder
+          audience={(form?.audience ?? "COLLEGE_ONLY") as Audience}
+          policy={form?.policy ?? { ...defaultEligibilityPolicy }}
+          departments={departments}
+          yearsText={yearsText}
+          onChange={(next) =>
+            setForm((f) => {
+              if (!f) return f;
+              const merged = {
+                ...f,
+                ...(next.audience ? { audience: next.audience as EventAudience } : {}),
+                ...(next.policy ? { policy: next.policy } : {}),
+              };
+              // Keep the typed text in sync when the builder parsed it for us.
+              if (next.policy) setYearsText(next.policy.graduationYears.join(", "));
+              return merged;
+            })
+          }
+        />
         <Field
-          label="Admission"
-          hint="Quiz modes need a quiz attached before the event can be submitted."
+          label="How seats are allocated"
+          hint="Not the same as who may register — that is above. Visitors from other colleges are always accepted by hand."
         >
           <select
             value={form?.admissionMode ?? ""}
             onChange={(e) => setForm((f) => (f ? { ...f, admissionMode: e.target.value } : f))}
           >
-            {/* The creator picks from the same list the editor offers. Hiding the
-                quiz modes here only meant people created the event as FCFS and
-                then had to come back and change it. */}
             {ADMISSION_MODES.map((m) => (
               <option key={m} value={m}>
                 {ADMISSION_MODE_LABELS[m]}
+                {m.startsWith("QUIZ") ? " — needs a quiz" : ""}
               </option>
             ))}
           </select>

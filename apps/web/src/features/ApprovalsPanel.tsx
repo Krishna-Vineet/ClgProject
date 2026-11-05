@@ -144,14 +144,19 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
                 </tr>
               </thead>
               <tbody>
-                {inbox.map(({ request, event, club }) => (
-                  <tr key={request.id}>
+                {inbox.map(({ request, event, club, resourceSummary }) => (
+                  <tr key={request.id} data-request-id={request.id}>
                     <td>
                       {request.title}
                       <small className="hint">
                         {APPROVAL_TYPE_LABELS[request.type]}
                         {request.isRequired ? " · required" : " · optional"}
                       </small>
+                      {/* Which room or lab this is about. Without it an approval
+                          of two identical "Lab booking" rows was a coin toss. */}
+                      {resourceSummary ? (
+                        <small className="hint resource-line">{resourceSummary}</small>
+                      ) : null}
                     </td>
                     <td>
                       {event.title}
@@ -164,7 +169,12 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
                       <ApprovalBadge status={request.status} />
                     </td>
                     <td>
-                      <button type="button" onClick={() => open(request)}>
+                      <button
+                        type="button"
+                        id={`approval-review-${request.id}`}
+                        aria-label={`Review ${request.title}`}
+                        onClick={() => open(request)}
+                      >
                         Review
                       </button>
                     </td>

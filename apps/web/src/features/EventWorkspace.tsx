@@ -17,7 +17,6 @@ import {
 } from "@campusops/shared/ui";
 import { type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { ConfirmDialog, Loading, Pager, useAction, useToast } from "../components/feedback";
-import { Icon } from "../components/icons";
 import {
   Card,
   Empty,
@@ -30,6 +29,7 @@ import {
 import { type Page, api, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
 import type { EventRow } from "../lib/types";
+import { type Audience, EligibilityBuilder, parseYears } from "./EligibilityBuilder";
 
 type Policy = {
   version: 1;
@@ -87,17 +87,6 @@ type AuditEntry = {
 };
 
 type Department = { id: string; code: string; name: string };
-
-function parseYears(value: string): number[] {
-  return Array.from(
-    new Set(
-      value
-        .split(/[,\s]+/)
-        .map((part) => Number(part))
-        .filter((year) => Number.isInteger(year) && year >= 2000 && year <= 2100),
-    ),
-  ).sort((a, b) => a - b);
-}
 
 // Loaded on demand: an organiser who never opens these tabs should not download
 // their code.
@@ -189,6 +178,7 @@ function toForm(e: Detail): EditForm {
  * Read-only sections stay visible when the API forbids a write, so a viewer
  * still sees the truth instead of an empty screen.
  */
+
 export function EventWorkspace({
   event,
   onChanged,
@@ -226,7 +216,7 @@ export function EventWorkspace({
   const [auditMore, setAuditMore] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const [confirm, setConfirm] = useState<null | "start" | "complete">(null);
+  const [confirm, setConfirm] = useState<null | "start" | "complete" | "delete">(null);
 
   const id = event.id;
 
@@ -381,6 +371,21 @@ export function EventWorkspace({
       await api(`/events/${id}/${kind}`, {});
       toast.ok(kind === "start" ? "Event is live." : "Event completed. Resources released.");
       await loadDetail();
+      await onChanged();
+    });
+  }
+
+  /**
+   * Delete a draft. Delegates the decision to the API rather than guessing: only
+   * a DRAFT with no registrations and no scans may be erased, and the server is
+   * the only place that can check all three at once.
+   */
+  async function removeDraft() {
+    setConfirm(null);
+    await action.run(async () => {
+      await api(`/events/${id}`, undefined, { method: "DELETE" });
+      toast.ok("Draft deleted.");
+      // The list no longer contains it, so there is nothing to reload here.
       await onChanged();
     });
   }
@@ -577,16 +582,57 @@ export function EventWorkspace({
 
           {tab === "edit" && editable && form && (
             <form className="form wide" onSubmit={saveEdit}>
+              {event.status === "DRAFT" && (
+                <div className="danger-zone span-2">
+                  <div>
+                    <strong>Delete this draft</strong>
+                    <p className="meta">
+                      Nothing has been published, nobody has registered, and no reviewer has been
+                      asked. Deleting removes it outright. Once an event has been seen by anyone, it
+                      is cancelled instead so the record survives.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="danger"
+                    disabled={action.busy}
+                    onClick={() => setConfirm("delete")}
+                  >
+                    Delete draft
+                  </button>
+                </div>
+              )}
               {event.status !== "DRAFT" && (
-                <p className="warn-note span-2">
-                  This event is <strong>{event.status.replace(/_/g, " ").toLowerCase()}</strong>.
-                  You can still fix the title, description, banner, template, job description,
-                  capacity and eligibility — those apply immediately. Changing the{" "}
-                  <strong>time, venue or registration window</strong> saves as a new draft revision
-                  and needs fresh approval before the event can be published again.
-                </p>
+                // The old copy was one dense sentence that named two rules, a
+                // status and an approval consequence at once, and it did not say
+                // which fields were which. Splitting it into "applies now" vs
+                // "needs approval", each labelled on the field itself, is the
+                // same information where it is actually needed.
+                <section className="edit-rules span-2">
+                  <h4>
+                    This event is {event.status.replace(/_/g, " ").toLowerCase()}. Editing still
+                    works — in two ways.
+                  </h4>
+                  <ul className="plain">
+                    <li>
+                      <span className="rule-tag now">Applies now</span>
+                      Title, description, banner, template, job description, capacity, eligibility.
+                      Participants see the change immediately; no new approval is needed.
+                    </li>
+                    <li>
+                      <span className="rule-tag later">New approval</span>
+                      Time, venue, and the registration window. These are what was approved, so
+                      saving them creates a new draft revision of this event and it must pass
+                      approval again before it goes back out. People already registered keep their
+                      places.
+                    </li>
+                  </ul>
+                </section>
               )}
               <h3 className="span-2">Event basics</h3>
+              <p className="form-group-note span-2">
+                <span className="rule-tag now">Applies now</span>
+              </p>
               <Field label="Title">
                 <input
                   required
@@ -645,6 +691,15 @@ export function EventWorkspace({
                 />
               </Field>
               <h3 className="span-2">Schedule and registration</h3>
+              {/* Same tag vocabulary as the panel above, so the rule is attached to
+                  the fields it applies to instead of only being described once at
+                  the top of the form. */}
+              {event.status !== "DRAFT" && (
+                <p className="form-group-note span-2">
+                  <span className="rule-tag later">New approval</span>
+                  Changing anything in this section creates a new draft revision.
+                </p>
+              )}
               <Field label="Starts">
                 <input
                   type="datetime-local"
@@ -713,141 +768,19 @@ export function EventWorkspace({
                 />
               </Field>
 
-              <fieldset className="span-2 eligibility-builder">
-                <legend>Who may register</legend>
-                <p className="hint">
-                  Leave a rule empty to put no restriction on that dimension. The server applies
-                  these rules the moment a student taps Register.
-                </p>
-
-                <div className="eligibility-group">
-                  <span className="eligibility-label">Account type</span>
-                  <div className="chip-toggle-row">
-                    {ACCOUNT_TYPES.map((t) => {
-                      const on = form.policy.accountTypes.includes(t);
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          aria-pressed={on}
-                          className={on ? "chip-toggle active" : "chip-toggle"}
-                          onClick={() =>
-                            setForm({
-                              ...form,
-                              policy: {
-                                ...form.policy,
-                                accountTypes: on
-                                  ? form.policy.accountTypes.filter((x) => x !== t)
-                                  : [...form.policy.accountTypes, t],
-                              },
-                            })
-                          }
-                        >
-                          {on ? <Icon name="check" size={12} /> : null}
-                          {ACCOUNT_TYPE_LABELS[t]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <small className="hint">
-                    {form.policy.accountTypes.length === 0
-                      ? "Any account type may register."
-                      : `Only ${form.policy.accountTypes
-                          .map((t) => ACCOUNT_TYPE_LABELS[t].toLowerCase())
-                          .join(", ")} may register.`}
-                  </small>
-                </div>
-
-                <div className="eligibility-group">
-                  <span className="eligibility-label">Departments</span>
-                  <div className="chip-toggle-row">
-                    <button
-                      type="button"
-                      aria-pressed={form.policy.departmentIds.length === 0}
-                      className={
-                        form.policy.departmentIds.length === 0
-                          ? "chip-toggle active"
-                          : "chip-toggle"
-                      }
-                      onClick={() =>
-                        setForm({ ...form, policy: { ...form.policy, departmentIds: [] } })
-                      }
-                    >
-                      Any department
-                    </button>
-                    {departments.map((d) => {
-                      const on = form.policy.departmentIds.includes(d.id);
-                      return (
-                        <button
-                          key={d.id}
-                          type="button"
-                          aria-pressed={on}
-                          className={on ? "chip-toggle active" : "chip-toggle"}
-                          onClick={() =>
-                            setForm({
-                              ...form,
-                              policy: {
-                                ...form.policy,
-                                departmentIds: on
-                                  ? form.policy.departmentIds.filter((x) => x !== d.id)
-                                  : [...form.policy.departmentIds, d.id],
-                              },
-                            })
-                          }
-                        >
-                          {on ? <Icon name="check" size={12} /> : null}
-                          {d.code}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="eligibility-group">
-                  <span className="eligibility-label">Graduation years</span>
-                  <Field
-                    label="Years"
-                    hint="Comma or space separated, e.g. 2026, 2027. Empty means any year."
-                  >
-                    <input
-                      inputMode="numeric"
-                      value={yearsText}
-                      placeholder="2026, 2027"
-                      onChange={(e) => {
-                        setYearsText(e.target.value);
-                        setForm({
-                          ...form,
-                          policy: { ...form.policy, graduationYears: parseYears(e.target.value) },
-                        });
-                      }}
-                      onBlur={() => setYearsText(parseYears(yearsText).join(", "))}
-                    />
-                  </Field>
-                  {form.policy.graduationYears.length > 0 && (
-                    <div className="chip-toggle-row">
-                      {form.policy.graduationYears.map((year) => (
-                        <span key={year} className="chip">
-                          {year}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.policy.requireInvitation}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        policy: { ...form.policy, requireInvitation: e.target.checked },
-                      })
-                    }
-                  />
-                  Require a personal invitation to register
-                </label>
-              </fieldset>
+              <EligibilityBuilder
+                audience={form.audience as Audience}
+                policy={form.policy}
+                departments={departments}
+                yearsText={yearsText}
+                onChange={(next) =>
+                  setForm({
+                    ...form,
+                    ...(next.audience ? { audience: next.audience as EventAudience } : {}),
+                    ...(next.policy ? { policy: next.policy } : {}),
+                  })
+                }
+              />
 
               <div className="row">
                 <button type="submit" disabled={action.busy}>
@@ -1048,17 +981,33 @@ export function EventWorkspace({
 
           <ConfirmDialog
             open={confirm !== null}
-            title={confirm === "start" ? "Start this event?" : "Mark this event completed?"}
+            title={
+              confirm === "start"
+                ? "Start this event?"
+                : confirm === "delete"
+                  ? `Delete “${event.title}”?`
+                  : "Mark this event completed?"
+            }
             description={
               confirm === "start"
                 ? "The event becomes LIVE and participants can check in."
-                : "The event is closed and its resource holds are released. This cannot be undone."
+                : confirm === "delete"
+                  ? "A draft has not been seen by anyone: no registrations, no scans, no reviewer has been asked. It is removed outright and cannot be recovered. Events that people have already seen are cancelled instead, so their history survives."
+                  : "The event is closed and its resource holds are released. This cannot be undone."
             }
-            confirmLabel={confirm === "start" ? "Start event" : "Mark completed"}
-            danger={confirm === "complete"}
+            confirmLabel={
+              confirm === "start"
+                ? "Start event"
+                : confirm === "delete"
+                  ? "Delete draft"
+                  : "Mark completed"
+            }
+            danger={confirm === "complete" || confirm === "delete"}
+            busy={action.busy}
             onCancel={() => setConfirm(null)}
             onConfirm={() => {
-              if (confirm) void transition(confirm);
+              if (confirm === "delete") void removeDraft();
+              else if (confirm) void transition(confirm);
             }}
           />
         </div>

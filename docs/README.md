@@ -12,6 +12,7 @@ Start here. Everything below is written for a developer who has never seen this 
 | [Deployment](deployment.md) | Neon → Render API → Vercel website → mobile builds, first Admin, email, S3, cron |
 | [Troubleshooting](troubleshooting.md) | The errors you are most likely to hit and their fixes |
 | [Security notes](security.md) | Threat model, what is enforced where, known limits |
+| [Search access audit](search-access-audit.md) | What each role can find in the console search, and why |
 
 Latest phase record: [Phase 6 report](phase6-report.md) · [Phase 6 critic audit](phase6-audit.md) · [verification log](phase6-verification.log). Earlier records and audits: `phase1-*` … `phase5-*`. Scope split between the two evaluations: [evaluation-scope.md](evaluation-scope.md).
 

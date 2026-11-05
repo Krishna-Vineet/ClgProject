@@ -58,6 +58,7 @@ type Config = {
   emailMode: string | null;
   exposeDemoOtp: boolean;
   storageMode: string;
+  storageReason?: string | null;
   institutionName?: string;
 };
 type Tab =
@@ -308,7 +309,10 @@ function Shell() {
     const list: Tab[] = ["dashboard"];
     if (isClubMember || isAdmin || isSenior) list.push("events");
     if (isStaff) list.push("approvals");
-    if (isFaculty || isSenior) list.push("verification");
+    // Verification is a faculty action. An HOD/Dean has the Students page,
+    // which shows the same people — including unverified ones — with the detail
+    // they actually need. A queue they cannot decide was just a dead end.
+    if (isFaculty) list.push("verification");
     if (isAdmin || isSenior) list.push("students");
     list.push("resources");
     if (isClubMember || isStaff) list.push("clubs", "reports");
@@ -623,7 +627,11 @@ function Shell() {
       return;
     }
     if (item.kind === "person") {
-      navigate("admin");
+      // Go where the person can actually be opened. Every person result used to
+      // send everyone to Administration, which faculty and HOD/Dean cannot open at
+      // all — the search found the student and then walked into a locked door. The
+      // API only returns people this role can already see on a page it can reach.
+      navigate(isAdmin ? "admin" : isSenior ? "students" : "verification");
       return;
     }
     if (item.kind === "tab") {
@@ -744,8 +752,14 @@ function Shell() {
               <span>
                 Email <strong>{config?.emailMode ?? "—"}</strong>
               </span>
-              <span>
-                Files <strong>{config?.storageMode ?? "—"}</strong>
+              <span title={config?.storageReason ?? undefined}>
+                Files{" "}
+                <strong>
+                  {/* "Files s3" told an operator the variable's value; what they
+                      need is whether uploads work, and the reason when they do
+                      not — which the API now reports. */}
+                  {config?.storageMode === "s3" ? "private" : "off"}
+                </strong>
               </span>
             </div>
             {config?.demoMode && <span className="badge warn">Demo mode</span>}
@@ -997,7 +1011,7 @@ function Shell() {
                     </span>
                   </button>
                 )}
-                {(isFaculty || isSenior) && dash && dash.work.verificationPending > 0 && (
+                {isFaculty && dash && dash.work.verificationPending > 0 && (
                   <button
                     type="button"
                     className="popover-item"
@@ -1103,7 +1117,7 @@ function Shell() {
                   />
                 )}
                 {active === "approvals" && isStaff && <ApprovalsPanel onChanged={refreshDash} />}
-                {active === "verification" && (isFaculty || isSenior) && (
+                {active === "verification" && isFaculty && (
                   <VerificationPanel onChanged={refreshDash} />
                 )}
                 {active === "students" && (isAdmin || isSenior) && <StudentsPanel />}

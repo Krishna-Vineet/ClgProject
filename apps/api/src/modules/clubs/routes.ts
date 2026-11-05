@@ -28,7 +28,11 @@ myClubRoutes.use("*", authenticate);
 myClubRoutes.get("/", async (c) => ok(c, { items: await service.myClubs(c.get("auth")) }));
 
 clubRoutes.get("/:id", requireClubRead(), async (c) => ok(c, c.get("club")));
-clubRoutes.patch("/:id", requireClubManage(), async (c) => {
+// A club is an institution-level object: its name, its department, whether it is
+// active. A lead runs their club's events; renaming or re-homing the club itself
+// is an administrative act. Admin only, deliberately narrower than "who can manage
+// members and events".
+clubRoutes.patch("/:id", requireRole("ADMIN"), async (c) => {
   const input = await parseJson(c, schemas.updateClubSchema);
   const row = await service.updateClub(c.req.param("id"), input, auditContext(c));
   return ok(c, row);

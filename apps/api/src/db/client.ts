@@ -71,3 +71,32 @@ export function resetDbCache(): DbClient | null {
 export async function closeDb(client: DbClient): Promise<void> {
   await client.sql.end({ timeout: 5 });
 }
+
+/**
+ * Race a unit of work against an abort signal.
+ *
+ * The request-timeout guard aborts the signal when it gives up on a request.
+ * Without this, the abandoned work keeps its transaction, its row locks and its
+ * pool slot, so a single timed-out write starves every later request on a small
+ * pool — the reason one slow approval decision turned into 504s everywhere.
+ * Rejecting *inside* the transaction callback makes Drizzle roll back, which
+ * hands the connection back and releases the locks immediately.
+ */
+export function raceAbort<T>(signal: AbortSignal | undefined, work: Promise<T>): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
+}

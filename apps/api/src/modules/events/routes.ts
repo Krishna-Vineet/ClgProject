@@ -174,6 +174,10 @@ eventRoutes.post("/:id/invitations", requireEventManage(), async (c) => {
   return ok(c, await service.invite(c.get("auth"), c.req.param("id"), input, auditContext(c)), 201);
 });
 
+eventRoutes.delete("/:id", requireEventManage(), async (c) =>
+  ok(c, await service.deleteDraft(c.get("auth"), c.req.param("id"), auditContext(c))),
+);
+
 eventRoutes.delete("/:id/invitations/:inviteId", requireEventManage(), async (c) =>
   ok(
     c,

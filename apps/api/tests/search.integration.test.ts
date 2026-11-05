@@ -8,6 +8,7 @@ import {
   departments,
   roleAssignments,
   staffProfiles,
+  studentProfiles,
   users,
 } from "../src/db/schema";
 import { hashPassword } from "../src/utils/password";
@@ -100,6 +101,24 @@ beforeAll(async () => {
   });
   const leadId = await makeUser("lead", "COLLEGE_STUDENT");
   await makeUser("outsider", "OUTSIDER_STUDENT");
+  // One student in the HOD's department and one in another: a scope test with no
+  // in-scope row would pass whether the scope worked or every student was hidden.
+  const ours = await makeUser("student", "COLLEGE_STUDENT");
+  const theirs = await makeUser("otherstudent", "COLLEGE_STUDENT");
+  await db.insert(studentProfiles).values({
+    userId: ours,
+    studentKind: "COLLEGE_STUDENT",
+    institutionName: "Test College",
+    departmentId: dept.id,
+    rollNumber: `${prefix}01`,
+  });
+  await db.insert(studentProfiles).values({
+    userId: theirs,
+    studentKind: "COLLEGE_STUDENT",
+    institutionName: "Test College",
+    departmentId: otherDept.id,
+    rollNumber: `${prefix}02`,
+  });
 
   const [club] = await db
     .insert(clubs)
@@ -196,10 +215,33 @@ describe("global search identity", () => {
     expect(lead?.roles).toEqual(["Coordinator", "Student"]);
   });
 
-  test("non-admins still cannot enumerate people", async () => {
-    const res = await request("GET", `/search?q=${prefix}`, tokens.hod);
+  /**
+   * The rule is "whoever you can open a profile for", not "nobody but an admin".
+   * This used to assert an empty list for an HOD, which is exactly the bug that
+   * was reported: the Students page listed their department while search claimed
+   * nobody matched. The boundary that matters is the department, so that is what
+   * is asserted here — plus the roles that legitimately get no people at all.
+   */
+  test("an HOD finds their own department's students and nobody else's", async () => {
+    const res = await request("GET", `/search?q=${prefix}%20student&limit=20`, tokens.hod);
+    expect(res.status).toBe(200);
+    const names = (res.json.data.people as Array<{ fullName: string }>).map((p) => p.fullName);
+    expect(names).toContain(`${prefix} student`);
+    expect(names).not.toContain(`${prefix} otherstudent`);
+  });
+
+  test("a department HOD cannot reach another department's students by name", async () => {
+    const res = await request("GET", `/search?q=${prefix}%20otherstudent`, tokens.hod);
     expect(res.status).toBe(200);
     expect(res.json.data.people).toEqual([]);
+  });
+
+  test("a club lead and a student get no people results at all", async () => {
+    for (const label of ["lead", "student"]) {
+      const res = await request("GET", `/search?q=${prefix}`, tokens[label]);
+      expect(res.status).toBe(200);
+      expect(res.json.data.people).toEqual([]);
+    }
   });
 });
 

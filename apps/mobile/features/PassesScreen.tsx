@@ -59,10 +59,13 @@ export function PassesScreen() {
       setLoading(false);
     }
   }, []);
+  // No background polling. The pass list only changes when the participant acts
+  // (pull to refresh, switching event, or tapping Refresh), and the code's own
+  // lifetime is measured against its expiry timestamp below. The old 20-second
+  // interval re-fetched the whole wallet — and the whole tree of checkpoints — to
+  // answer a question the clock on the device already knows the answer to.
   useEffect(() => {
     void load();
-    const timer = setInterval(() => void load(), 20_000);
-    return () => clearInterval(timer);
   }, [load]);
 
   const mint = useCallback(async () => {
@@ -99,26 +102,20 @@ export function PassesScreen() {
       generation.current++;
     };
   }, [mint]);
+  // One tick per second, purely to redraw the countdown. Nothing here calls the
+  // API: when the clock reaches zero the code is marked expired and stays on
+  // screen as expired until the participant taps Refresh. Silently re-minting
+  // meant the code in front of a gatekeeper could change under them mid-scan,
+  // and it hid the fact that the code had a lifetime at all.
   useEffect(() => {
     if (!nonce) return;
-    const timer = setInterval(() => {
-      const left = Math.max(
-        0,
-        Math.ceil((new Date(nonce.expiresAt).getTime() - Date.now()) / 1000),
-      );
-      setSeconds(left);
-      if (left === 0) {
-        setNonce(null);
-        void mint();
-      }
-    }, 1000);
+    const update = () =>
+      setSeconds(Math.max(0, Math.ceil((new Date(nonce.expiresAt).getTime() - Date.now()) / 1000)));
+    update();
+    const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [nonce, mint]);
-  useEffect(() => {
-    if (!nonce) return;
-    const timer = setTimeout(() => void mint(), nonce.refreshAfterSeconds * 1000);
-    return () => clearTimeout(timer);
-  }, [nonce, mint]);
+  }, [nonce]);
+  const expired = Boolean(nonce) && seconds <= 0;
 
   if (loading)
     return (
@@ -258,7 +255,7 @@ export function PassesScreen() {
                         />
                       )}
                       <View style={{ alignItems: "center", gap: 10, paddingVertical: 10 }}>
-                        {qr.availableNow && nonce ? (
+                        {qr.availableNow && nonce && !expired ? (
                           <>
                             <View
                               style={{
@@ -280,11 +277,42 @@ export function PassesScreen() {
                                   backgroundColor: colors.good,
                                 }}
                               />
-                              <Text style={{ fontSize: 11.5, color: colors.muted }}>
-                                Refreshes in {seconds}s · valid for this QR only
+                              <Text
+                                style={{ fontSize: 11.5, color: colors.muted }}
+                                accessibilityLiveRegion="polite"
+                              >
+                                {seconds}s left on this code · valid for this QR only
                               </Text>
                             </View>
                           </>
+                        ) : qr.availableNow && expired ? (
+                          // Expired, not gone: keep the card in place, say exactly
+                          // what happened, and make the fix a single explicit tap.
+                          // The 60s lifetime is the point — a code that never
+                          // expires can be screenshotted and shared.
+                          <View style={{ alignItems: "center", gap: 10, paddingVertical: 16 }}>
+                            <Badge label="Code expired" tone="warn" />
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                color: colors.muted,
+                                textAlign: "center",
+                                lineHeight: 18,
+                                maxWidth: 260,
+                              }}
+                            >
+                              This code was valid for about a minute after it appeared. Refresh to
+                              get a new one — the gate needs a live code.
+                            </Text>
+                            <Button
+                              label={codeBusy ? "Refreshing…" : "Refresh"}
+                              onPress={() => {
+                                void mint();
+                              }}
+                              disabled={codeBusy}
+                              testID="pass-refresh-code"
+                            />
+                          </View>
                         ) : codeBusy ? (
                           <Loading label="Preparing secure code…" />
                         ) : (
@@ -318,9 +346,11 @@ export function PassesScreen() {
                       <Button
                         label="Refresh code & status"
                         variant="ghost"
+                        disabled={codeBusy}
                         onPress={() => {
-                          void load();
-                          void mint();
+                          // Status first (the QR may have been switched off while the
+                          // code was expiring), then the code itself.
+                          void load().then(() => mint());
                         }}
                       />
                     </Card>

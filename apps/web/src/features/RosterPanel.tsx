@@ -213,7 +213,7 @@ export function RosterPanel({ event, canManage }: { event: EventRow; canManage: 
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} data-registration-id={r.id}>
                     <td>
                       {r.fullName}
                       <div className="meta">{r.email}</div>
@@ -247,25 +247,36 @@ export function RosterPanel({ event, canManage }: { event: EventRow; canManage: 
                     {canManage && (
                       <td>
                         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-                          {r.status === "APPLIED" && event.admissionMode === "MANUAL" && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={action.busy}
-                                onClick={() => setDecide({ row: r, decision: "CONFIRMED" })}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                disabled={action.busy}
-                                onClick={() => setDecide({ row: r, decision: "REJECTED" })}
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
+                          {/* A pending application must always be actionable. This
+                              used to render only for MANUAL events, but outsiders on
+                              any other-college audience are held as APPLIED too — so
+                              their row said "Awaiting decision" with no way to decide.
+                              Same condition as the API's decideApplication. */}
+                          {r.status === "APPLIED" &&
+                            (event.admissionMode === "MANUAL" ||
+                              event.audience !== "COLLEGE_ONLY") && (
+                              <>
+                                <button
+                                  type="button"
+                                  id={`roster-approve-${r.id}`}
+                                  aria-label={`Approve ${r.fullName}`}
+                                  disabled={action.busy}
+                                  onClick={() => setDecide({ row: r, decision: "CONFIRMED" })}
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  id={`roster-reject-${r.id}`}
+                                  aria-label={`Reject ${r.fullName}`}
+                                  className="ghost"
+                                  disabled={action.busy}
+                                  onClick={() => setDecide({ row: r, decision: "REJECTED" })}
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
                           {(r.status === "CONFIRMED" || r.status === "WAITLISTED") && (
                             <button
                               type="button"
@@ -292,10 +303,12 @@ export function RosterPanel({ event, canManage }: { event: EventRow; canManage: 
           hasMore={offset + rows.length < total}
           onChange={setOffset}
         />
-        {event.admissionMode === "MANUAL" && (
+        {(event.admissionMode === "MANUAL" || event.audience !== "COLLEGE_ONLY") && (
           <p className="meta">
             Approving beyond capacity places the applicant on the waitlist instead of overbooking.
             Each decision is recorded against your account.
+            {event.audience !== "COLLEGE_ONLY" &&
+              " Visitors from other colleges always arrive as applications, whatever the seat allocation."}
           </p>
         )}
       </Card>

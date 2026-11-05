@@ -112,6 +112,13 @@ export type InboxItem = {
   request: ApprovalRequestRow;
   event: { id: string; title: string; startsAt: string; status: EventStatus };
   club: { id: string; name: string; departmentId: string | null };
+  /**
+   * What this request is actually about, when it is about a room or a lab:
+   * "Computer Lab 2 · Lab 2 Room", or "… +2 more". Null for non-resource asks.
+   * The API has always computed it; the inbox simply never showed it, so a
+   * reviewer approving a resource request could not see which resource.
+   */
+  resourceSummary?: string | null;
 };
 
 export type RequestDetail = {

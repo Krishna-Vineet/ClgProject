@@ -1179,7 +1179,11 @@ export const auditLogs = pgTable(
     entityType: text("entity_type").notNull(),
     entityId: uuid("entity_id"),
     clubId: uuid("club_id").references(() => clubs.id),
-    eventId: uuid("event_id").references(() => events.id),
+    // Deliberately NOT a foreign key. An audit row must outlive what it describes,
+    // and audit_logs is append-only — so neither RESTRICT (blocks the delete) nor
+    // SET NULL (an UPDATE, which the append-only trigger refuses) can work here.
+    // `entity_type` + `entity_id` is the reference this table actually uses.
+    eventId: uuid("event_id"),
     beforeData: jsonb("before_data"),
     afterData: jsonb("after_data"),
     requestId: text("request_id"),

@@ -12,6 +12,7 @@ export type ApiErrorCode =
   | "DATABASE_UNAVAILABLE"
   | "DATABASE_SCHEMA_OUT_OF_DATE"
   | "DATABASE_CONNECTION_LOST"
+  | "DATABASE_BUSY"
   | "REQUEST_TIMEOUT"
   | "INVALID_CREDENTIALS"
   | "EMAIL_EXISTS"
@@ -52,6 +53,8 @@ const statusByCode: Record<ApiErrorCode, number> = {
   DATABASE_SCHEMA_OUT_OF_DATE: 503,
   // 503, not 500: the request is safe to replay and the client may retry.
   DATABASE_CONNECTION_LOST: 503,
+  // 503, not 500: a lock wait is temporary and the caller should come back.
+  DATABASE_BUSY: 503,
   INVALID_CREDENTIALS: 401,
   EMAIL_EXISTS: 409,
   TOKEN_INVALID: 400,

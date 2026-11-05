@@ -3,7 +3,7 @@ export type ParticipantQuiz = {
   quiz: {
     id: string;
     mode: "TOP_N" | "FIRST_QUALIFIED";
-    status: "DRAFT" | "PUBLISHED" | "CLOSED";
+    status: "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED";
     opensAt: string;
     closesAt: string;
     durationSeconds: number;
@@ -32,6 +32,8 @@ export type ParticipantQuiz = {
     queuePosition: number | null;
   } | null;
   windowOpen?: boolean;
+  /** Clock-derived state, so the phone never has to re-derive the window. */
+  phase?: "DRAFT" | "BEFORE_OPEN" | "OPEN" | "PAUSED" | "WINDOW_CLOSED" | "CLOSED";
 };
 
 export type Paper = {

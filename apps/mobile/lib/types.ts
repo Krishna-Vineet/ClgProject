@@ -70,6 +70,13 @@ export type Registration = {
 export type ParticipantView = {
   event: EventRow;
   club: { id: string; name: string };
+  /** Who to ring: the club's faculty and its lead(s). Phone may be missing. */
+  contacts?: Array<{
+    id: string;
+    fullName: string;
+    role: "FACULTY" | "LEAD";
+    phone: string | null;
+  }>;
   registration: { id: string; status: RegistrationStatus; queuePosition: number | null } | null;
   eligibility: {
     eligible: boolean;

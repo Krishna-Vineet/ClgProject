@@ -30,9 +30,14 @@ import { useSession } from "../lib/session";
 import type { EventRow, ParticipantView, Registration } from "../lib/types";
 
 export function EventsScreen({
+  openEventId,
+  onOpenConsumed,
   onOpenPasses,
   onOpenQuiz,
 }: {
+  /** An event to open on arrival, e.g. from an announcement. */
+  openEventId?: string | null;
+  onOpenConsumed?: () => void;
   onOpenPasses: () => void;
   onOpenQuiz?: (eventId: string, title: string) => void;
 }) {
@@ -82,6 +87,12 @@ export function EventsScreen({
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    if (!openEventId) return;
+    setSelected(openEventId);
+    onOpenConsumed?.();
+  }, [openEventId, onOpenConsumed]);
+
   useEffect(() => {
     if (!selected) {
       setDetail(null);
@@ -203,6 +214,25 @@ export function EventsScreen({
                 {detail.event.description || "The coordinator has not added a description yet."}
               </Muted>
             </Card>
+            {/*
+              The number is the point. A student stuck at the gate at 09:55 needs
+              a human, and "contact your coordinator" without a number is advice,
+              not help. Numbers are only shown where the club actually has one.
+            */}
+            {detail.contacts && detail.contacts.length > 0 && (
+              <Card title="Who to call">
+                {detail.contacts.map((c) => (
+                  <Row
+                    key={c.id}
+                    label={`${c.role === "FACULTY" ? "Club faculty" : "Club lead"} · ${c.fullName}`}
+                    value={c.phone ?? "No number on file"}
+                  />
+                ))}
+                <Muted>
+                  Tap a number in your phone's dialler. Club faculty approve exceptions.
+                </Muted>
+              </Card>
+            )}
             {detail.event.jobDescription && (
               <Card title="Job description">
                 <Muted>{detail.event.jobDescription}</Muted>
@@ -211,8 +241,14 @@ export function EventsScreen({
             {detail.event.cancellationReason && (
               <Note message={`Cancelled: ${detail.event.cancellationReason}`} />
             )}
-            {(detail.event.admissionMode === "QUIZ_TOP_N" ||
-              detail.event.admissionMode === "QUIZ_FIRST_QUALIFIED") &&
+            {/*
+              A student's job is one thing at a time: register first, then take
+              the quiz that decides the seat. Offering "Open the quiz" before the
+              registration exists just leads to an error screen.
+            */}
+            {detail.registration &&
+              (detail.event.admissionMode === "QUIZ_TOP_N" ||
+                detail.event.admissionMode === "QUIZ_FIRST_QUALIFIED") &&
               onOpenQuiz && (
                 <Card title="Seats are decided by a quiz">
                   <Muted>
@@ -239,6 +275,14 @@ export function EventsScreen({
                 {detail.registration.status === "CONFIRMED" && (
                   <Button label="Open my pass" onPress={onOpenPasses} />
                 )}
+                {(detail.event.admissionMode === "QUIZ_TOP_N" ||
+                  detail.event.admissionMode === "QUIZ_FIRST_QUALIFIED") &&
+                  detail.registration.status === "APPLIED" && (
+                    <Muted>
+                      Your seat is decided by the quiz. Open it from the card above before it
+                      closes.
+                    </Muted>
+                  )}
                 {(detail.registration.status === "CONFIRMED" ||
                   detail.registration.status === "WAITLISTED" ||
                   detail.registration.status === "APPLIED") &&

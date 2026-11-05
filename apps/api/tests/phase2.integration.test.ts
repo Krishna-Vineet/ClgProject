@@ -59,6 +59,11 @@ maybe("phase 2 auth and permissions", () => {
   const invitedEmail = `phase2.invited.${stamp}@test.campusops.local`;
   const staffEmail = `phase2.staff.${stamp}@test.campusops.local`;
   const invitedEventId = U(980);
+  // Its own college-only event instead of the demo seed row: other suites and
+  // manual probes edit that row (a venue edit even re-drafts it), which used to
+  // fail this file for reasons that had nothing to do with auth.
+  const collegeEventId = U(981);
+  const collegeEventTitle = `Phase 2 College Only ${stamp}`;
 
   beforeAll(async () => {
     client = createDb(url as string, 4);
@@ -89,6 +94,28 @@ maybe("phase 2 auth and permissions", () => {
       })
       .onConflictDoNothing();
     await client.db
+      .insert(events)
+      .values({
+        id: collegeEventId,
+        clubId: U(40),
+        createdBy: U(14),
+        title: collegeEventTitle,
+        slug: `phase2-college-${stamp}`,
+        template: "WORKSHOP",
+        status: "PUBLISHED",
+        audience: "COLLEGE_ONLY",
+        admissionMode: "FCFS",
+        capacity: 20,
+        startsAt: new Date(Date.now() + 86400000),
+        endsAt: new Date(Date.now() + 90000000),
+        registrationOpensAt: new Date(),
+        registrationClosesAt: new Date(Date.now() + 80000000),
+        venueSummary: "Test Hall",
+        publishedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    await client.db
       .insert(eventInvitations)
       .values({
         eventId: invitedEventId,
@@ -107,6 +134,7 @@ maybe("phase 2 auth and permissions", () => {
     if (client) {
       await client.db.delete(eventInvitations).where(eq(eventInvitations.eventId, invitedEventId));
       await client.db.delete(events).where(eq(events.id, invitedEventId));
+      await client.db.delete(events).where(eq(events.id, collegeEventId));
       await closeDb(client);
     }
   });
@@ -186,14 +214,14 @@ maybe("phase 2 auth and permissions", () => {
     // files create events, and the default page is 25 rows.
     const allowed = await req(
       "GET",
-      "/api/v1/events?q=Intro%20to%20Git%20Workshop&limit=100",
+      `/api/v1/events?q=${encodeURIComponent(collegeEventTitle)}&limit=100`,
       undefined,
       collegeToken,
     );
     expect(allowed.status).toBe(200);
-    expect(data<{ items: Array<{ id: string }> }>(allowed).items.some((e) => e.id === U(80))).toBe(
-      true,
-    );
+    expect(
+      data<{ items: Array<{ id: string }> }>(allowed).items.some((e) => e.id === collegeEventId),
+    ).toBe(true);
   });
 
   test("outsider self-verifies but cannot see college-only events; invited-only works by invitation", async () => {
@@ -225,7 +253,7 @@ maybe("phase 2 auth and permissions", () => {
     expect(ids).toContain(U(81));
     // Negative visibility is asserted by direct fetch: absence from a paginated
     // list would pass even if the event were wrongly visible.
-    const hidden = await req("GET", `/api/v1/events/${U(80)}`, undefined, outsiderToken);
+    const hidden = await req("GET", `/api/v1/events/${collegeEventId}`, undefined, outsiderToken);
     expect(hidden.status).toBe(404);
     const notInvited = await req(
       "GET",

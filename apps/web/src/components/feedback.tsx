@@ -64,10 +64,51 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [push],
   );
 
+  /**
+   * The toast host is a *popover*, not a positioned div.
+   *
+   * Anything inside `.shell` loses to `dialog::backdrop`, which the browser
+   * paints in the top layer above every z-index. A toast raised from inside a
+   * modal was therefore dimmed and blurred behind the backdrop — exactly when it
+   * mattered most ("that did not save"). A manual popover also lives in the top
+   * layer, and because it is opened after the dialog it stacks above it.
+   */
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const popover = el as HTMLDivElement & {
+      showPopover?: () => void;
+      hidePopover?: () => void;
+    };
+    if (toasts.length > 0) {
+      // Re-showing is harmless and keeps us above a dialog opened later.
+      try {
+        if (!el.matches(":popover-open")) popover.showPopover?.();
+      } catch {
+        // A browser without the popover API simply falls back to z-index.
+      }
+    } else {
+      try {
+        if (el.matches(":popover-open")) popover.hidePopover?.();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [toasts.length]);
+
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <output className="toasts" aria-live="polite">
+      {/* A div, not <output>: React's typing for <output> predates the popover
+          attribute, and a live region is what matters here, not the tag. */}
+      <div
+        ref={hostRef}
+        {...({ popover: "manual" } as Record<string, string>)}
+        className="toasts"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}${t.leaving ? " leaving" : ""}`}>
             <span className="toast-icon" aria-hidden="true">
@@ -87,7 +128,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </button>
           </div>
         ))}
-      </output>
+      </div>
     </ToastContext.Provider>
   );
 }

@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Lint/format | `bun run lint` | Biome rules across all workspaces | nothing |
 | Types | `bun run typecheck` | Strict TS in shared, API, web, mobile | nothing |
-| API unit + integration | `bun run test` | 410 tests: domain rules, auth/session/refresh-reuse-by-family, consent versioning, account export/delete, roles/scope, staff-directory scoping, approvals/escalation, resource exclusion, registrations race/waitlist, QR rules/scan/replay, complaints privacy, reports immutability, OpenAPI parity, dashboard scoping | `TEST_DATABASE_URL` (migrated + seeded) |
+| API unit + integration | `bun run test` | 421 tests: domain rules, auth/session/refresh-reuse-by-family, consent versioning, account export/delete, roles/scope, staff-directory scoping, approvals/escalation, resource exclusion, registrations race/waitlist, QR rules/scan/replay, complaints privacy, reports immutability, OpenAPI parity, dashboard scoping | `TEST_DATABASE_URL` (migrated + seeded) |
 | Web build | `bun run build:web` | Production bundle compiles; deterministic output | nothing |
 | Browser e2e (web) | `bun run e2e:all` | Dashboard, events lifecycle, approvals, admin, clubs, resources, verification, QR rules, complaint posters, reports — real Chromium against real API | API :8787 + web :5173 + `E2E_PASSWORD` |
 | Browser e2e (mobile) | `bun run e2e:mobile` | Exported mobile bundle: auth, events, passes, scanner, complaints, profile, signup fields, 390 px overflow | API + mobile preview :8081 + `E2E_PASSWORD` |

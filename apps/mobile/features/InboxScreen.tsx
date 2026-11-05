@@ -17,17 +17,21 @@ import { when } from "../lib/format";
 import type { Announcement } from "../lib/quizTypes";
 
 /**
- * Announcement inbox. Read state lives on the server so it follows the account
- * across phones, and opening an item marks it read exactly once (the endpoint is
- * idempotent).
+ * Announcement inbox.
+ *
+ * Seeing the list *is* reading it: opening this tab clears the unread badge in
+ * one call, and the announcements stay here afterwards because they are updates
+ * about events the student is part of, not messages to be archived. The only
+ * thing a tap does now is expand a long body — there is no read/unread toggle to
+ * get out of step with the badge.
  */
 export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Announcement[]>([]);
   const [unread, setUnread] = useState(0);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -35,6 +39,19 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
       const data = await api<Page<Announcement> & { unread: number }>("/me/announcements?limit=50");
       setItems(data.items);
       setUnread(data.unread);
+      // Mark what arrived since the last visit, then clear the badge for good.
+      // The "New" chips are derived from this snapshot, so they survive the
+      // badge being cleared — the student still sees what changed.
+      setNewIds(new Set(data.items.filter((i) => !i.readAt).map((i) => i.id)));
+      if (data.unread > 0) {
+        try {
+          await api("/me/announcements/read-all", {});
+          setUnread(0);
+        } catch {
+          // A failed mark-read must not hide the announcements themselves; the
+          // badge simply stays until the next visit succeeds.
+        }
+      }
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -45,24 +62,6 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function read(item: Announcement) {
-    setOpen(open === item.id ? null : item.id);
-    if (item.readAt) return;
-    setBusy(true);
-    try {
-      await api(`/me/announcements/${item.id}/read`, {});
-      // Optimistic locally, then reconciled with the server's count.
-      setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, readAt: new Date().toISOString() } : i)),
-      );
-      setUnread((n) => Math.max(0, n - 1));
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (loading)
     return (
@@ -81,7 +80,7 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
       <Note message={error} />
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Badge
-          label={unread === 0 ? "All caught up" : `${unread} unread`}
+          label={unread === 0 ? "All caught up" : `${unread} new`}
           tone={unread ? "primary" : "good"}
         />
         <Button label="Refresh" variant="ghost" onPress={() => void load()} />
@@ -99,7 +98,7 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
             <Card key={item.id} title={item.title}>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
                 {item.isPinned && <Badge label="Pinned" tone="warn" />}
-                {!item.readAt && <Badge label="New" tone="primary" />}
+                {newIds.has(item.id) && <Badge label="New" tone="primary" />}
               </View>
               <Muted>{item.event?.title ?? "Event update"}</Muted>
               <Text
@@ -110,10 +109,9 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
               </Text>
               <Muted>{when(item.publishedAt)}</Muted>
               <Button
-                label={expanded ? "Close" : item.readAt ? "Read again" : "Read"}
+                label={expanded ? "Show less" : "Show more"}
                 variant="ghost"
-                busy={busy && open === item.id}
-                onPress={() => void read(item)}
+                onPress={() => setOpen(expanded ? null : item.id)}
                 testID={`announcement-${item.id}`}
               />
               {expanded && onOpenEvent && (

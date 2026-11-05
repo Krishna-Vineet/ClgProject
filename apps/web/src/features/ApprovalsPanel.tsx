@@ -1,5 +1,6 @@
 import { APPROVAL_TIER_LABELS, APPROVAL_TYPE_LABELS } from "@campusops/shared/ui";
 import { useCallback, useEffect, useState } from "react";
+import { Modal, useToast } from "../components/feedback";
 import {
   ApprovalBadge,
   Card,
@@ -20,18 +21,18 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
   const [reassignees, setReassignees] = useState<Approver[]>([]);
   const [reassignTo, setReassignTo] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A failed decision happens *inside* the dialog. `ErrorNote` lives behind the
+  // backdrop, so it cannot carry the message; the toast layer can.
+  const toast = useToast();
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scope, setScope] = useState<"all" | "assigned" | "queue">("all");
-  const [counts, setCounts] = useState({ assigned: 0, queue: 0, all: 0 });
-
   const load = useCallback(async () => {
-    const page = await api<Page<InboxItem> & { counts: typeof counts }>(
-      `/approvals/inbox${query({ scope, limit: 50 })}`,
-    );
+    // No scope switch: the inbox is already exactly what this person may decide
+    // — their named asks plus the shared queue for a tier they hold. Asking them
+    // to pick a bucket first was a choice with no wrong answer.
+    const page = await api<Page<InboxItem>>(`/approvals/inbox${query({ limit: 50 })}`);
     setInbox(page.items);
-    if (page.counts) setCounts(page.counts);
-  }, [scope]);
+  }, []);
 
   useEffect(() => {
     load().catch((err) => setError(errorMessage(err)));
@@ -72,7 +73,8 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
       await load();
       onChanged?.();
     } catch (err) {
-      setError(errorMessage(err));
+      // No setError here on purpose: the panel's ErrorNote is behind the dialog.
+      toast.err(errorMessage(err));
       // A stale version means someone else acted: refresh so the UI is honest.
       try {
         setDetail(await api<RequestDetail>(`/approval-requests/${detail.request.id}`));
@@ -99,7 +101,7 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
       await load();
       onChanged?.();
     } catch (err) {
-      setError(errorMessage(err));
+      toast.err(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -121,47 +123,13 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
           </button>
         }
       >
-        <div className="scope-switch" role="tablist" aria-label="Approval scope">
-          {(
-            [
-              ["assigned", "Assigned to me", "Named asks"],
-              ["queue", "My tier queue", "Unclaimed"],
-              ["all", "Everything", "Both"],
-            ] as const
-          ).map(([value, label, hint]) => (
-            <button
-              type="button"
-              key={value}
-              role="tab"
-              aria-selected={scope === value}
-              className={scope === value ? "scope-option active" : "scope-option"}
-              onClick={() => setScope(value)}
-            >
-              <span>{label}</span>
-              <strong>{counts[value]}</strong>
-              <small>{hint}</small>
-            </button>
-          ))}
-        </div>
         <p className="scope-help">
-          {scope === "assigned"
-            ? "Requests a coordinator (or another approver) sent to you by name. Only you decide these."
-            : scope === "queue"
-              ? "Unclaimed requests waiting at a tier you hold. Anyone with that role and department scope can pick one up; it stays shared until decided."
-              : "Your named asks plus the shared queue for your tier. Queue items are not reserved by opening them."}{" "}
-          Faculty requests are always addressed to a named reviewer, so a faculty-only reviewer
-          usually sees an empty queue. HOD/Dean and Admin have shared queues.
+          Every request below is one you can decide: the ones addressed to you by name, plus
+          unclaimed requests waiting at a tier you hold.
         </p>
         {inbox.length === 0 ? (
-          <Empty
-            title={scope === "queue" ? "Your tier queue is clear" : "No approvals waiting"}
-            icon="check"
-          >
-            {scope === "queue"
-              ? "Unclaimed requests for your role will appear here. Named requests stay under Assigned to me."
-              : scope === "assigned"
-                ? "Nobody has sent you a request by name right now."
-                : "There is nothing to decide in either your named asks or your tier queue."}
+          <Empty title="Nothing to decide" icon="check">
+            Requests addressed to you, and unclaimed ones at your tier, appear here.
           </Empty>
         ) : (
           <div className="scroll-x">
@@ -208,61 +176,24 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
         )}
       </Card>
 
-      {detail && (
-        <Card
-          title={detail.request.title}
-          actions={<ApprovalBadge status={detail.request.status} />}
-        >
-          <p className="meta">
-            {detail.event.title} · {detail.club.name} · awaiting{" "}
-            {APPROVAL_TIER_LABELS[detail.request.currentTier]} · version {detail.request.version}
-          </p>
-          {detail.request.description && <p>{detail.request.description}</p>}
-
-          {detail.resources.length > 0 && (
-            <div className="resources">
-              <h3>Resources in this permission</h3>
-              {detail.resources.map((r) => (
-                <p key={r.unit.id} className="meta">
-                  {r.resource.name} — {r.unit.label} · {formatWhen(r.link.startsAt)} –{" "}
-                  {formatWhen(r.link.endsAt)}
-                </p>
-              ))}
-              <div className="row">
-                {detail.reservations.map((r) => (
-                  <span key={r.id} className="row">
-                    <ReservationBadge status={r.status} />
-                    {r.holdExpiresAt && (
-                      <small className="hint">hold until {formatWhen(r.holdExpiresAt)}</small>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {detail.request.status === "PENDING" && (
+      <Modal
+        open={detail !== null}
+        size="lg"
+        title={detail?.request.title ?? "Approval"}
+        description={
+          detail ? (
             <>
-              <Field
-                label="Comment"
-                hint="Required when rejecting, requesting changes, or escalating."
-              >
-                <textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-              </Field>
-              <div className="row">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    send(
-                      "decision",
-                      { action: "APPROVE", ...(comment ? { comment } : {}) },
-                      "Approved.",
-                    )
-                  }
-                >
-                  Approve
-                </button>
+              {detail.event.title} · {detail.club.name} · awaiting{" "}
+              {APPROVAL_TIER_LABELS[detail.request.currentTier]} · version {detail.request.version}
+            </>
+          ) : undefined
+        }
+        busy={busy}
+        onClose={() => setDetail(null)}
+        footer={
+          <>
+            {detail?.request.status === "PENDING" && (
+              <>
                 <button
                   type="button"
                   className="danger"
@@ -288,6 +219,7 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
                 {detail.request.currentTier !== "ADMIN" && (
                   <button
                     type="button"
+                    className="ghost"
                     disabled={busy}
                     onClick={() =>
                       send(
@@ -303,49 +235,102 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
                     Escalate to {detail.request.currentTier === "FACULTY" ? "HOD/Dean" : "Admin"}
                   </button>
                 )}
-              </div>
+              </>
+            )}
+            <button type="button" className="ghost" disabled={busy} onClick={() => setDetail(null)}>
+              Close
+            </button>
+            {detail?.request.status === "PENDING" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  send(
+                    "decision",
+                    { action: "APPROVE", ...(comment ? { comment } : {}) },
+                    "Approved.",
+                  )
+                }
+              >
+                Approve
+              </button>
+            )}
+          </>
+        }
+      >
+        {detail && (
+          <>
+            {detail.request.description && <p>{detail.request.description}</p>}
 
-              {detail.request.currentTier === "FACULTY" && reassignees.length > 0 && (
+            {detail.resources.length > 0 && (
+              <div className="resources">
+                <h3>Resources in this permission</h3>
+                {detail.resources.map((r) => (
+                  <p key={r.unit.id} className="meta">
+                    {r.resource.name} — {r.unit.label} · {formatWhen(r.link.startsAt)} –{" "}
+                    {formatWhen(r.link.endsAt)}
+                  </p>
+                ))}
                 <div className="row">
-                  <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
-                    <option value="">Ask another faculty instead…</option>
-                    {reassignees.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.fullName}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="ghost"
-                    disabled={busy || !reassignTo}
-                    onClick={reassign}
-                  >
-                    Reassign
-                  </button>
+                  {detail.reservations.map((r) => (
+                    <span key={r.id} className="row">
+                      <ReservationBadge status={r.status} />
+                      {r.holdExpiresAt && (
+                        <small className="hint">hold until {formatWhen(r.holdExpiresAt)}</small>
+                      )}
+                    </span>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
 
-          <h3>History</h3>
-          <ol className="timeline">
-            {detail.actions.map(({ action, actor }) => (
-              <li key={action.id}>
-                <strong>{action.action}</strong> · {actor.fullName}
-                {action.toTier && <span> → {APPROVAL_TIER_LABELS[action.toTier]}</span>}
-                {action.comment && <p className="meta">“{action.comment}”</p>}
-                <small className="hint">
-                  {formatWhen(action.createdAt)} · v{action.requestVersion}
-                </small>
-              </li>
-            ))}
-          </ol>
-          <button type="button" className="ghost" onClick={() => setDetail(null)}>
-            Close
-          </button>
-        </Card>
-      )}
+            {detail.request.status === "PENDING" && (
+              <>
+                <Field
+                  label="Comment"
+                  hint="Required when rejecting, requesting changes, or escalating."
+                >
+                  <textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
+                </Field>
+                {detail.request.currentTier === "FACULTY" && reassignees.length > 0 && (
+                  <div className="row">
+                    <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
+                      <option value="">Ask another faculty instead…</option>
+                      {reassignees.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={busy || !reassignTo}
+                      onClick={reassign}
+                    >
+                      Reassign
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <h3>History</h3>
+            <ol className="timeline">
+              {detail.actions.map(({ action, actor }) => (
+                <li key={action.id}>
+                  <strong>{action.action}</strong> · {actor.fullName}
+                  {action.toTier && <span> → {APPROVAL_TIER_LABELS[action.toTier]}</span>}
+                  {action.comment && <p className="meta">“{action.comment}”</p>}
+                  <small className="hint">
+                    {formatWhen(action.createdAt)} · v{action.requestVersion}
+                  </small>
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+      </Modal>
     </>
   );
 }

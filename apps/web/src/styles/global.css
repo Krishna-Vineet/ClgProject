@@ -1976,16 +1976,29 @@ dl.kv dd {
 }
 
 /* ── Feedback ─────────────────────────────────────────────────────────── */
+/*
+ * Toasts live in the browser top layer (see feedback.tsx), so they are positioned
+ * with inset rather than a stacking context, and the browser's default popover
+ * chrome (border, background, centring, `margin: auto`) is undone deliberately.
+ */
 .toasts {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  inset: 16px 20px auto auto;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 120;
+  /* Above the dialog itself when both are open. */
+  z-index: 2147483000;
   max-width: min(400px, calc(100vw - 32px));
   pointer-events: none;
+}
+.toasts:not(:popover-open) {
+  display: none;
 }
 .toast {
   pointer-events: auto;
@@ -2927,10 +2940,11 @@ dl.kv dd {
   .content {
     padding: 18px 14px 60px;
   }
+  /* Same rule as desktop: notices ride at the top, never over the primary
+     action a thumb is reaching for. Anchoring top *and* bottom would stretch
+     the fixed box across the viewport. */
   .toasts {
-    right: 12px;
-    left: 12px;
-    bottom: 12px;
+    inset: 12px 12px auto 12px;
     max-width: none;
   }
   .modal {
@@ -3067,7 +3081,7 @@ dl.kv dd {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(-10px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -3077,7 +3091,7 @@ dl.kv dd {
 @keyframes toast-out {
   to {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(-6px);
   }
 }
 @keyframes shimmer {
@@ -4875,4 +4889,61 @@ button.week-booking.confirmed {
   .booking-tip {
     width: 264px;
   }
+}
+
+/* ── Eligibility builder ──────────────────────────────────────────────────
+ * The registration rules were three unrelated inputs in a bordered box: a row
+ * of checkboxes, a multi-select that needed ctrl-click, and a free-text year
+ * field. They are now one shape — pick chips, or leave the group empty for
+ * "any". Empty is a decision, so it is a chip you can click, not a blank. */
+.eligibility-builder {
+  gap: 18px;
+}
+.eligibility-group {
+  display: grid;
+  gap: 8px;
+}
+.eligibility-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chip-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+button.chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 450;
+  min-height: 0;
+  transition: background 0.14s var(--ease), border-color 0.14s var(--ease), color 0.14s var(--ease);
+}
+button.chip-toggle:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+button.chip-toggle.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-on-ink);
+}
+button.chip-toggle.active:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper-on-ink);
+}
+.eligibility-builder .checkbox {
+  padding-top: 4px;
 }

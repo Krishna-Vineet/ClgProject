@@ -58,9 +58,44 @@ export function effectiveEventStatus(
   return status;
 }
 
-/** Editing rules: a submitted event is frozen; changes require a new revision. */
+/**
+ * Editing rules.
+ *
+ * A coordinator can always fix the things that do not change what was approved:
+ * a typo in the title, a better description, the banner. What was approved is
+ * *when*, *where* and *with what* — so a change to the schedule, the venue or the
+ * resources behind it drops the event back to a draft revision and re-opens
+ * approvals. Freezing the whole event for a description fix teaches people to
+ * route around the product; freezing only the approved facts keeps the audit
+ * trail honest without getting in the way.
+ */
+export const REVISION_FORCING_EVENT_FIELDS = [
+  "startsAt",
+  "endsAt",
+  "registrationOpensAt",
+  "registrationClosesAt",
+  "venueSummary",
+  "onlineMeetingUrl",
+] as const;
+
+export type RevisionForcingEventField = (typeof REVISION_FORCING_EVENT_FIELDS)[number];
+
+/** A finished or abandoned event is history; nothing about it is editable. */
 export function canEditEvent(status: EventStatus): boolean {
-  return status === "DRAFT";
+  return status !== "COMPLETED" && status !== "CANCELLED";
+}
+
+/**
+ * Does this edit touch something that was approved?
+ *
+ * The caller passes only the keys the client sent, so an absent field never
+ * counts as a change. `updateEvent` uses this to decide, in one transaction,
+ * whether the edit lands in place or becomes a new draft revision.
+ */
+export function requiresRevision(attemptedFields: readonly string[]): boolean {
+  return attemptedFields.some((field) =>
+    (REVISION_FORCING_EVENT_FIELDS as readonly string[]).includes(field),
+  );
 }
 
 /**

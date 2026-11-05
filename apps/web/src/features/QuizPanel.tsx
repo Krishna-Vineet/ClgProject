@@ -101,7 +101,9 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
     seats: "" as string,
   });
   const [board, setBoard] = useState<LeaderRow[]>([]);
-  const [confirm, setConfirm] = useState<"publish" | "close" | "allocate" | null>(null);
+  const [confirm, setConfirm] = useState<
+    "publish" | "pause" | "resume" | "close" | "allocate" | null
+  >(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -222,12 +224,20 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
             `Seats allocated: ${result.confirmed} confirmed, ${result.waitlisted} waitlisted.`,
           );
         } else {
-          await api(
-            `/quizzes/${quiz.id}/status`,
-            { status: target === "publish" ? "PUBLISHED" : "CLOSED" },
-            { method: "PATCH" },
+          const nextStatus =
+            target === "publish" || target === "resume"
+              ? "PUBLISHED"
+              : target === "pause"
+                ? "PAUSED"
+                : "CLOSED";
+          await api(`/quizzes/${quiz.id}/status`, { status: nextStatus }, { method: "PATCH" });
+          toast.ok(
+            nextStatus === "PUBLISHED"
+              ? "Quiz is open for attempts. The clock decides when it closes."
+              : nextStatus === "PAUSED"
+                ? "Quiz paused. Nobody new can start; attempts already running carry on."
+                : "Quiz closed. Any attempt still running was ended.",
           );
-          toast.ok(target === "publish" ? "Quiz is open for attempts." : "Quiz closed.");
         }
         await load();
       } catch (err) {
@@ -263,21 +273,43 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
         )}
         {canManage && quiz && (
           <div className="row" style={{ marginTop: 12, flexWrap: "wrap" }}>
-            {quiz.status === "DRAFT" && (
+            {/*
+              The open and close times are authoritative. Inside that window the
+              coordinator gets one lever — pause and resume, as often as they
+              like — because a network blip at 10:00 should not end an exam.
+            */}
+            {(quiz.status === "DRAFT" || quiz.status === "CLOSED") && (
               <button type="button" disabled={action.busy} onClick={() => setConfirm("publish")}>
-                Open for attempts
+                {quiz.status === "CLOSED" ? "Reopen for attempts" : "Open for attempts"}
               </button>
             )}
             {quiz.status === "PUBLISHED" && (
-              <button type="button" disabled={action.busy} onClick={() => setConfirm("close")}>
-                Close quiz
+              <>
+                <button type="button" disabled={action.busy} onClick={() => setConfirm("pause")}>
+                  Pause quiz
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={action.busy}
+                  onClick={() => setConfirm("close")}
+                >
+                  Close quiz early
+                </button>
+              </>
+            )}
+            {quiz.status === "PAUSED" && (
+              <button type="button" disabled={action.busy} onClick={() => setConfirm("resume")}>
+                Resume quiz
               </button>
             )}
-            {mode === "TOP_N" && quiz.status === "CLOSED" && !quiz.allocatedAt && (
-              <button type="button" disabled={action.busy} onClick={() => setConfirm("allocate")}>
-                Allocate seats by rank
-              </button>
-            )}
+            {mode === "TOP_N" &&
+              (quiz.status === "CLOSED" || new Date(quiz.closesAt) < new Date()) &&
+              !quiz.allocatedAt && (
+                <button type="button" disabled={action.busy} onClick={() => setConfirm("allocate")}>
+                  Allocate seats by rank
+                </button>
+              )}
           </div>
         )}
         {mode === "FIRST_QUALIFIED" && (
@@ -577,19 +609,25 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
         title={
           confirm === "publish"
             ? "Open this quiz for attempts?"
-            : confirm === "close"
-              ? "Close this quiz?"
-              : "Allocate seats by rank?"
+            : confirm === "resume"
+              ? "Resume this quiz?"
+              : confirm === "pause"
+                ? "Pause this quiz?"
+                : confirm === "close"
+                  ? "Close this quiz early?"
+                  : "Allocate seats by rank?"
         }
         description={
-          confirm === "publish"
-            ? "Participants will be able to start their one attempt inside the window. The paper can no longer be edited."
-            : confirm === "close"
-              ? "Any attempt still running is expired immediately. Nobody can start a new attempt."
-              : "The highest scores take the available seats; everyone else is waitlisted in rank order. This runs once and cannot be repeated."
+          confirm === "publish" || confirm === "resume"
+            ? "Participants will be able to start their attempt while the window is open. The paper can no longer be edited."
+            : confirm === "pause"
+              ? "Nobody new can start. Anyone already answering keeps their timer and can still submit — pause stops entry, not the clock. You can resume as many times as you need."
+              : confirm === "close"
+                ? "This ends the quiz before its close time. Any attempt still running is expired immediately, and nobody can start a new one unless you reopen it inside the window."
+                : "The highest scores take the available seats; everyone else is waitlisted in rank order. This runs once and cannot be repeated."
         }
         confirmLabel={confirm === "allocate" ? "Allocate seats" : "Confirm"}
-        danger={confirm !== "publish"}
+        danger={confirm === "close" || confirm === "allocate"}
         busy={action.busy}
         reasonLabel={confirm === "allocate" ? "Note for the audit trail (optional)" : undefined}
         onCancel={() => setConfirm(null)}

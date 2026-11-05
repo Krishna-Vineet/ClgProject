@@ -186,6 +186,10 @@ export function EventApprovals({
       setError("Add at least one permission before submitting.");
       return;
     }
+    if (drafts.some((d) => !d.assignedApproverId)) {
+      setError("Choose who reviews each permission. Every request needs a named reviewer.");
+      return;
+    }
     void run(async () => {
       await api(`/events/${event.id}/submit`, {
         expectedRevision: event.currentRevision,
@@ -193,7 +197,7 @@ export function EventApprovals({
           type: draft.type,
           title: draft.title.trim(),
           isRequired: draft.isRequired,
-          assignedApproverId: draft.assignedApproverId || null,
+          assignedApproverId: draft.assignedApproverId,
           resources:
             draft.type === "RESOURCE_USE" && draft.resourceUnitId
               ? [
@@ -340,8 +344,12 @@ export function EventApprovals({
                           }
                         />
                       </Field>
-                      <Field label="Reviewer" hint="Leave blank to send it to the role queue.">
+                      {/* A permission is always addressed to a person. An
+                          unassigned request is nobody's job, which is why the
+                          "role queue" fallback was a trap rather than a shortcut. */}
+                      <Field label="Reviewer">
                         <select
+                          required
                           value={draft.assignedApproverId}
                           onChange={(e) =>
                             setDrafts((prev) =>
@@ -351,7 +359,9 @@ export function EventApprovals({
                             )
                           }
                         >
-                          <option value="">Role queue</option>
+                          {!draft.assignedApproverId && (
+                            <option value="">Choose a reviewer…</option>
+                          )}
                           {approvers.map((a) => (
                             <option key={a.id} value={a.id}>
                               {a.fullName}
@@ -491,7 +501,7 @@ export function EventApprovals({
                     <dl className="approval-facts">
                       <div>
                         <dt>Reviewer</dt>
-                        <dd>{assignee?.fullName ?? "Role queue"}</dd>
+                        <dd>{assignee?.fullName ?? "Unassigned"}</dd>
                       </div>
                       <div>
                         <dt>Version</dt>

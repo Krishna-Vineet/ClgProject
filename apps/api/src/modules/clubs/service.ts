@@ -40,25 +40,46 @@ async function assertNotLastLead(clubId: string, membershipId: string) {
     throw new ApiError("CONFLICT", "Promote another lead before removing the last one.");
 }
 
-async function assertIsFacultyAccount(userId: string) {
+/**
+ * The roles whose holder may act as a club's faculty.
+ *
+ * Faculty approve directly; HOD/Dean approve within their department and Admin
+ * institution-wide, and all three are staff who can scan and open exceptions.
+ * Keeping this list in one place is what stopped the picker and the permission
+ * check from disagreeing.
+ */
+const FACULTY_ELIGIBLE_ROLES = ["FACULTY", "HOD_DEAN", "ADMIN"] as const;
+
+async function assertIsFacultyAccount(userId: string, clubDepartmentId: string | null) {
   const { db } = getDb();
-  const [row] = await db
-    .select({ user: users, role: roleAssignments })
+  const rows = await db
+    .select({
+      role: roleAssignments.role,
+      scopeType: roleAssignments.scopeType,
+      departmentId: roleAssignments.departmentId,
+    })
     .from(users)
     .innerJoin(roleAssignments, eq(roleAssignments.userId, users.id))
     .where(
       and(
         eq(users.id, userId),
         eq(users.accountType, "STAFF"),
-        eq(roleAssignments.role, "FACULTY"),
         eq(roleAssignments.isActive, true),
+        inArray(roleAssignments.role, [...FACULTY_ELIGIBLE_ROLES]),
       ),
-    )
-    .limit(1);
-  if (!row)
+    );
+  const ok = rows.some(
+    (r) =>
+      r.role === "FACULTY" ||
+      r.role === "ADMIN" ||
+      (r.role === "HOD_DEAN" &&
+        (r.scopeType === "GLOBAL" ||
+          (clubDepartmentId !== null && r.departmentId === clubDepartmentId))),
+  );
+  if (!ok)
     throw new ApiError(
       "VALIDATION_ERROR",
-      "Club faculty must be an active staff member with the FACULTY role.",
+      "Club faculty must be an active staff member who can approve this club's events (faculty, the department's HOD/Dean, or an admin).",
     );
 }
 
@@ -208,14 +229,25 @@ export async function findMemberCandidates(input: {
   const { db } = getDb();
   const pattern = `%${input.q}%`;
   if (input.role === "FACULTY") {
-    // Club faculty must hold the institutional FACULTY role, so the picker only
-    // offers accounts that can actually approve events.
+    /*
+     * Who may be a club's faculty?
+     *
+     * Anyone who is a member of staff and is allowed to approve that club's
+     * events — which is not the same as "holds the FACULTY role". An HOD/Dean
+     * and an Admin both approve; both were being filtered out of this picker,
+     * so the screen said "no matching faculty" while the person sat right there
+     * in the staff directory. The permission check (`assertIsFacultyAccount`)
+     * already accepts a staff approver, so the picker now matches it.
+     */
     const staff = await db
       .select({
         id: users.id,
         fullName: users.fullName,
         email: users.email,
         accountType: users.accountType,
+        role: roleAssignments.role,
+        scopeType: roleAssignments.scopeType,
+        departmentId: roleAssignments.departmentId,
       })
       .from(users)
       .innerJoin(roleAssignments, eq(roleAssignments.userId, users.id))
@@ -223,16 +255,34 @@ export async function findMemberCandidates(input: {
         and(
           eq(users.status, "ACTIVE"),
           eq(users.accountType, "STAFF"),
-          eq(roleAssignments.role, "FACULTY"),
           eq(roleAssignments.isActive, true),
+          inArray(roleAssignments.role, [...FACULTY_ELIGIBLE_ROLES]),
           or(ilike(users.email, pattern), ilike(users.fullName, pattern)),
         ),
       )
       .orderBy(users.fullName)
-      .limit(input.limit);
-    // A faculty member can hold the role in several departments; offer them once.
-    const byId = new Map(staff.map((r) => [r.id, r]));
-    return { items: [...byId.values()] };
+      .limit(input.limit * 4);
+    // A person can hold several assignments; offer them once, and only if at
+    // least one of them actually covers the authority to approve.
+    const byId = new Map<
+      string,
+      { id: string; fullName: string; email: string; accountType: string }
+    >();
+    for (const r of staff) {
+      const covers =
+        r.role === "ADMIN" ||
+        r.role === "FACULTY" ||
+        r.scopeType === "GLOBAL" ||
+        (r.role === "HOD_DEAN" && r.departmentId !== null);
+      if (covers && !byId.has(r.id))
+        byId.set(r.id, {
+          id: r.id,
+          fullName: r.fullName,
+          email: r.email,
+          accountType: r.accountType,
+        });
+    }
+    return { items: [...byId.values()].slice(0, input.limit) };
   }
   const rows = await db
     .select({
@@ -266,7 +316,7 @@ export async function addMember(
   if (!club) throw new ApiError("NOT_FOUND", "Club not found.");
   if (input.clubRole === "FACULTY") {
     assertMayManageFaculty(auth, club.departmentId);
-    await assertIsFacultyAccount(input.userId);
+    await assertIsFacultyAccount(input.userId, club.departmentId);
   }
   const [target] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
   if (!target) throw new ApiError("NOT_FOUND", "User not found.");
@@ -331,7 +381,7 @@ export async function updateMember(
   // institutional decision, not a club-lead one.
   if (row.clubRole === "FACULTY" || input.clubRole === "FACULTY")
     assertMayManageFaculty(auth, club.departmentId);
-  if (input.clubRole === "FACULTY") await assertIsFacultyAccount(row.userId);
+  if (input.clubRole === "FACULTY") await assertIsFacultyAccount(row.userId, club.departmentId);
   if (row.clubRole === "LEAD" && (input.clubRole === "COORDINATOR" || input.isActive === false))
     await assertNotLastLead(clubId, membershipId);
   return db.transaction(async (tx) => {

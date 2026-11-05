@@ -263,6 +263,54 @@ export async function markRead(auth: AuthContext, announcementId: string) {
   return { read: true };
 }
 
+/**
+ * Mark everything currently visible in the inbox as read, in one statement.
+ *
+ * The phone used to have to open each announcement and tap "Read" to clear the
+ * badge, which turned reading the news into a chore and left the counter lying
+ * whenever someone glanced at a card without expanding it. Seeing the inbox is
+ * the act of reading it: the list stays, only the *unread* marker goes.
+ *
+ * Visibility is rebuilt from the same predicate as `myInbox`, so this can never
+ * mark something the student is not allowed to see.
+ */
+export async function markAllRead(auth: AuthContext) {
+  const { db } = getDb();
+  const visible = await visibleEventPredicate(auth);
+  const myRegs = await db
+    .select({ eventId: registrations.eventId })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.userId, auth.user.id),
+        inArray(registrations.status, ["CONFIRMED", "WAITLISTED", "APPLIED"]),
+      ),
+    );
+  const registeredIds = myRegs.map((r) => r.eventId);
+  const scope = and(
+    visible,
+    isNull(announcements.revokedAt),
+    or(
+      eq(announcements.audience, "ALL_VISIBLE"),
+      registeredIds.length ? inArray(announcements.eventId, registeredIds) : sql`false`,
+    ),
+  );
+
+  // The visibility predicate is expressed against `events`, so this query must
+  // join it exactly as the inbox does — otherwise Postgres rejects the WHERE.
+  const rows = await db
+    .select({ id: announcements.id })
+    .from(announcements)
+    .innerJoin(events, eq(events.id, announcements.eventId))
+    .where(scope);
+  if (rows.length === 0) return { read: 0, unread: 0 };
+  await db
+    .insert(announcementReads)
+    .values(rows.map((r) => ({ announcementId: r.id, userId: auth.user.id })))
+    .onConflictDoNothing();
+  return { read: rows.length, unread: 0 };
+}
+
 // ── Push devices ────────────────────────────────────────────────────────────
 
 /**

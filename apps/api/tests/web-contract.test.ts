@@ -58,11 +58,20 @@ describe("web request payloads match the API schemas", () => {
     expect(parsed.success).toBe(true);
   });
 
-  test("inbox scope values are the ones the API accepts", async () => {
+  test("the inbox asks for no scope: one flat list of decidable requests", async () => {
     const src = await source("features/ApprovalsPanel.tsx");
-    const scopes = [...src.matchAll(/\[\s*"(all|assigned|queue|actionable)",/g)].map((m) => m[1]);
-    expect(scopes.length).toBeGreaterThan(0);
-    for (const scope of scopes) {
+    // Deliberate product decision: the three-way switch ("Assigned to me" / "My tier
+    // queue" / "Everything") is gone. Every row in the inbox is already something the
+    // viewer may act on, so the panel must not send a scope at all, and must not
+    // reintroduce the switch or its "tier queue" copy.
+    expect(src).not.toMatch(/scope\s*:/);
+    expect(src).not.toContain("My tier queue");
+    expect(src).not.toContain('role="tablist"');
+    // Not sending a scope has to stay valid: the API default is the flat list.
+    expect(shared.approvalInboxQuerySchema.safeParse({}).success).toBe(true);
+    // The API still accepts the old scope values (other clients may send them); the
+    // panel simply no longer chooses one.
+    for (const scope of ["all", "assigned", "queue"]) {
       expect(shared.approvalInboxQuerySchema.safeParse({ scope }).success).toBe(true);
     }
   });
@@ -102,16 +111,26 @@ describe("web request payloads match the API schemas", () => {
     expect(parsed.success).toBe(true);
   });
 
-  test("the draft form only offers admission modes the API accepts today", async () => {
+  test("the draft form offers every admission mode, straight from the shared list", async () => {
     const src = await source("features/CoordinatorPanel.tsx");
-    const modes = [
-      ...src.matchAll(/<option value="(FCFS|MANUAL|QUIZ_TOP_N|QUIZ_FIRST_QUALIFIED)">/g),
-    ].map((m) => m[1] as string);
-    expect(modes).toEqual(["FCFS", "MANUAL"]);
-    for (const admissionMode of modes) {
-      expect(shared.validateAdmissionForAudience("COLLEGE_ONLY", admissionMode as "FCFS")).toEqual(
-        [],
-      );
+    // The old form hardcoded FCFS + MANUAL, so a coordinator could not create a quiz-based
+    // event at all. It must now render ADMISSION_MODES rather than a hand-written list.
+    expect(src).toContain("ADMISSION_MODES.map(");
+    expect(src).not.toMatch(/<option value="(FCFS|MANUAL|QUIZ_TOP_N|QUIZ_FIRST_QUALIFIED)">/);
+    // Quiz modes are only valid once a quiz is attached; FCFS/MANUAL always are.
+    for (const admissionMode of shared.ADMISSION_MODES) {
+      const quizMode = admissionMode.startsWith("QUIZ_");
+      expect(
+        shared.validateAdmissionForAudience("COLLEGE_ONLY", admissionMode, {
+          hasLinkedQuiz: quizMode,
+        }),
+      ).toEqual([]);
+      if (quizMode) {
+        // Offering it before a quiz exists must still produce the coaching message.
+        expect(
+          shared.validateAdmissionForAudience("COLLEGE_ONLY", admissionMode).length,
+        ).toBeGreaterThan(0);
+      }
     }
   });
 

@@ -43,3 +43,48 @@ describe("database schema errors", () => {
     expect(body.error.code).toBe("INTERNAL_ERROR");
   });
 });
+
+describe("lock contention", () => {
+  function appThrowingPg(code: string) {
+    const cause = Object.assign(new Error("boom"), { code });
+    const error = new Error("Failed query", { cause });
+    const app = new Hono();
+    app.onError(errorHandler);
+    app.get("/boom", () => {
+      throw error;
+    });
+    return app;
+  }
+
+  test("a lock wait that ran out is a retryable 503, not a 20-second 504", async () => {
+    const res = await appThrowingPg("55P03").request("/boom");
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("DATABASE_BUSY");
+    expect(body.error.message).toContain("Nothing was saved");
+    expect(res.headers.get("Retry-After")).toBe("2");
+  });
+
+  test("a statement timeout is still a 504 but carries Retry-After", async () => {
+    const res = await appThrowingPg("57014").request("/boom");
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("REQUEST_TIMEOUT");
+    expect(res.headers.get("Retry-After")).toBe("5");
+  });
+
+  test("a dropped connection tells the client when to retry", async () => {
+    const cause = Object.assign(new Error("write CONNECTION_CLOSED"), {
+      code: "CONNECTION_CLOSED",
+    });
+    const error = new Error("Failed query", { cause });
+    const app = new Hono();
+    app.onError(errorHandler);
+    app.get("/boom", () => {
+      throw error;
+    });
+    const res = await app.request("/boom");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("2");
+  });
+});

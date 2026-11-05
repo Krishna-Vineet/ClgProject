@@ -54,6 +54,9 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("events");
   const [locationId, setLocationId] = useState<string | null>(null);
   const [quizTarget, setQuizTarget] = useState<{ id: string; title: string } | null>(null);
+  // Opening an event from an announcement lands on the event itself, not just on
+  // the events tab: a venue change is useless if the student has to search again.
+  const [eventTarget, setEventTarget] = useState<string | null>(null);
   const screenStyle = useScreenIn(tab);
 
   useEffect(() => {
@@ -127,11 +130,21 @@ function Shell() {
             />
           ) : (
             <EventsScreen
+              openEventId={eventTarget}
+              onOpenConsumed={() => setEventTarget(null)}
               onOpenPasses={() => setTab("passes")}
               onOpenQuiz={(id, title) => setQuizTarget({ id, title })}
             />
           ))}
-        {tab === "inbox" && <InboxScreen />}
+        {tab === "inbox" && (
+          <InboxScreen
+            onOpenEvent={(eventId) => {
+              setQuizTarget(null);
+              setEventTarget(eventId);
+              setTab("events");
+            }}
+          />
+        )}
         {tab === "passes" && <PassesScreen />}
         {tab === "scan" && <ScannerScreen onComplaint={openComplaint} />}
         {tab === "issues" && (
@@ -170,7 +183,10 @@ function Shell() {
               onPress={() => {
                 setTab(item.id);
                 if (item.id !== "issues") setLocationId(null);
-                if (item.id !== "events") setQuizTarget(null);
+                if (item.id !== "events") {
+                  setQuizTarget(null);
+                  setEventTarget(null);
+                }
               }}
               style={({ pressed }) => [s.tab, pressed && { opacity: 0.7 }]}
             >

@@ -17,6 +17,7 @@ import {
 } from "@campusops/shared/ui";
 import { type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { ConfirmDialog, Loading, Pager, useAction, useToast } from "../components/feedback";
+import { Icon } from "../components/icons";
 import {
   Card,
   Empty,
@@ -312,6 +313,15 @@ export function EventWorkspace({
       return;
     }
     const graduationYears = parseYears(yearsText);
+    const scheduleChanged =
+      fromLocalInput(form.startsAt) !== fromLocalInput(toLocalInput(new Date(detail.startsAt))) ||
+      fromLocalInput(form.endsAt) !== fromLocalInput(toLocalInput(new Date(detail.endsAt))) ||
+      fromLocalInput(form.registrationOpensAt) !==
+        fromLocalInput(toLocalInput(new Date(detail.registrationOpensAt))) ||
+      fromLocalInput(form.registrationClosesAt) !==
+        fromLocalInput(toLocalInput(new Date(detail.registrationClosesAt))) ||
+      (form.venueSummary || null) !== (detail.venueSummary ?? null) ||
+      (form.onlineMeetingUrl || null) !== (detail.onlineMeetingUrl ?? null);
     await action.run(async () => {
       await api(
         `/events/${id}`,
@@ -322,19 +332,44 @@ export function EventWorkspace({
           audience: form.audience,
           admissionMode: form.admissionMode,
           capacity: Number(form.capacity),
-          startsAt: fromLocalInput(form.startsAt),
-          endsAt: fromLocalInput(form.endsAt),
-          registrationOpensAt: fromLocalInput(form.registrationOpensAt),
-          registrationClosesAt: fromLocalInput(form.registrationClosesAt),
-          venueSummary: form.venueSummary || null,
-          onlineMeetingUrl: form.onlineMeetingUrl || null,
           jobDescription: form.jobDescription || null,
           eligibilityPolicy: { ...form.policy, graduationYears },
+          // The schedule and venue are what an approval covered. A live event
+          // still accepts them, but the server turns that save into a new draft
+          // revision — so only send them when they actually changed, otherwise
+          // every typo fix would start an approval round.
+          ...(scheduleChanged
+            ? {
+                startsAt: fromLocalInput(form.startsAt),
+                endsAt: fromLocalInput(form.endsAt),
+                registrationOpensAt: fromLocalInput(form.registrationOpensAt),
+                registrationClosesAt: fromLocalInput(form.registrationClosesAt),
+                venueSummary: form.venueSummary || null,
+                onlineMeetingUrl: form.onlineMeetingUrl || null,
+              }
+            : event.status === "DRAFT"
+              ? {
+                  startsAt: fromLocalInput(form.startsAt),
+                  endsAt: fromLocalInput(form.endsAt),
+                  registrationOpensAt: fromLocalInput(form.registrationOpensAt),
+                  registrationClosesAt: fromLocalInput(form.registrationClosesAt),
+                  venueSummary: form.venueSummary || null,
+                  onlineMeetingUrl: form.onlineMeetingUrl || null,
+                }
+              : {}),
           expectedRevision: detail.currentRevision,
         },
         { method: "PATCH" },
       );
-      toast.ok("Draft updated.");
+      // Say what actually happened: a schedule change on a live event is not a
+      // quiet edit, it reopens approvals, and the coordinator must know that.
+      toast.ok(
+        event.status === "DRAFT"
+          ? "Draft updated."
+          : scheduleChanged
+            ? "Saved as a new draft revision. Time and venue changes need fresh approval before this event can be published again."
+            : "Event updated. Students see the change immediately.",
+      );
       await loadDetail();
       await onChanged();
     });
@@ -532,10 +567,9 @@ export function EventWorkspace({
           )}
 
           {tab === "edit" && canManage && !editable && (
-            <Empty>
-              Only a DRAFT can be edited. Open <strong>Approvals</strong> and choose{" "}
-              <strong>Revise event</strong> to turn a submitted event into a new draft; changing a
-              critical field will require fresh approvals.
+            <Empty title="This event is finished">
+              A completed or cancelled event is kept as history. Create a new event if you are
+              running it again.
             </Empty>
           )}
 
@@ -543,6 +577,15 @@ export function EventWorkspace({
 
           {tab === "edit" && editable && form && (
             <form className="form wide" onSubmit={saveEdit}>
+              {event.status !== "DRAFT" && (
+                <p className="warn-note span-2">
+                  This event is <strong>{event.status.replace(/_/g, " ").toLowerCase()}</strong>.
+                  You can still fix the title, description, banner, template, job description,
+                  capacity and eligibility — those apply immediately. Changing the{" "}
+                  <strong>time, venue or registration window</strong> saves as a new draft revision
+                  and needs fresh approval before the event can be published again.
+                </p>
+              )}
               <h3 className="span-2">Event basics</h3>
               <Field label="Title">
                 <input
@@ -670,74 +713,127 @@ export function EventWorkspace({
                 />
               </Field>
 
-              <fieldset className="span-2">
+              <fieldset className="span-2 eligibility-builder">
                 <legend>Who may register</legend>
                 <p className="hint">
-                  Empty lists mean no restriction on that dimension. These rules are evaluated by
-                  the server when a student applies.
+                  Leave a rule empty to put no restriction on that dimension. The server applies
+                  these rules the moment a student taps Register.
                 </p>
-                <div className="row wrap">
-                  {ACCOUNT_TYPES.map((t) => (
-                    <label key={t} className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.policy.accountTypes.includes(t)}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            policy: {
-                              ...form.policy,
-                              accountTypes: e.target.checked
-                                ? [...form.policy.accountTypes, t]
-                                : form.policy.accountTypes.filter((x) => x !== t),
-                            },
-                          })
-                        }
-                      />
-                      {ACCOUNT_TYPE_LABELS[t]}
-                    </label>
-                  ))}
+
+                <div className="eligibility-group">
+                  <span className="eligibility-label">Account type</span>
+                  <div className="chip-toggle-row">
+                    {ACCOUNT_TYPES.map((t) => {
+                      const on = form.policy.accountTypes.includes(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          aria-pressed={on}
+                          className={on ? "chip-toggle active" : "chip-toggle"}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              policy: {
+                                ...form.policy,
+                                accountTypes: on
+                                  ? form.policy.accountTypes.filter((x) => x !== t)
+                                  : [...form.policy.accountTypes, t],
+                              },
+                            })
+                          }
+                        >
+                          {on ? <Icon name="check" size={12} /> : null}
+                          {ACCOUNT_TYPE_LABELS[t]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <small className="hint">
+                    {form.policy.accountTypes.length === 0
+                      ? "Any account type may register."
+                      : `Only ${form.policy.accountTypes
+                          .map((t) => ACCOUNT_TYPE_LABELS[t].toLowerCase())
+                          .join(", ")} may register.`}
+                  </small>
                 </div>
-                <Field label="Restrict to departments">
-                  <select
-                    multiple
-                    size={Math.min(6, Math.max(3, departments.length))}
-                    value={form.policy.departmentIds}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        policy: {
-                          ...form.policy,
-                          departmentIds: Array.from(e.target.selectedOptions).map((o) => o.value),
-                        },
-                      })
-                    }
+
+                <div className="eligibility-group">
+                  <span className="eligibility-label">Departments</span>
+                  <div className="chip-toggle-row">
+                    <button
+                      type="button"
+                      aria-pressed={form.policy.departmentIds.length === 0}
+                      className={
+                        form.policy.departmentIds.length === 0
+                          ? "chip-toggle active"
+                          : "chip-toggle"
+                      }
+                      onClick={() =>
+                        setForm({ ...form, policy: { ...form.policy, departmentIds: [] } })
+                      }
+                    >
+                      Any department
+                    </button>
+                    {departments.map((d) => {
+                      const on = form.policy.departmentIds.includes(d.id);
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          aria-pressed={on}
+                          className={on ? "chip-toggle active" : "chip-toggle"}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              policy: {
+                                ...form.policy,
+                                departmentIds: on
+                                  ? form.policy.departmentIds.filter((x) => x !== d.id)
+                                  : [...form.policy.departmentIds, d.id],
+                              },
+                            })
+                          }
+                        >
+                          {on ? <Icon name="check" size={12} /> : null}
+                          {d.code}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="eligibility-group">
+                  <span className="eligibility-label">Graduation years</span>
+                  <Field
+                    label="Years"
+                    hint="Comma or space separated, e.g. 2026, 2027. Empty means any year."
                   >
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.code} — {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field
-                  label="Graduation years"
-                  hint="Type years separated by commas or spaces, e.g. 2026, 2027. Leave empty for any year."
-                >
-                  <input
-                    inputMode="numeric"
-                    value={yearsText}
-                    placeholder="2026, 2027"
-                    onChange={(e) => {
-                      setYearsText(e.target.value);
-                      setForm({
-                        ...form,
-                        policy: { ...form.policy, graduationYears: parseYears(e.target.value) },
-                      });
-                    }}
-                    onBlur={() => setYearsText(parseYears(yearsText).join(", "))}
-                  />
-                </Field>
+                    <input
+                      inputMode="numeric"
+                      value={yearsText}
+                      placeholder="2026, 2027"
+                      onChange={(e) => {
+                        setYearsText(e.target.value);
+                        setForm({
+                          ...form,
+                          policy: { ...form.policy, graduationYears: parseYears(e.target.value) },
+                        });
+                      }}
+                      onBlur={() => setYearsText(parseYears(yearsText).join(", "))}
+                    />
+                  </Field>
+                  {form.policy.graduationYears.length > 0 && (
+                    <div className="chip-toggle-row">
+                      {form.policy.graduationYears.map((year) => (
+                        <span key={year} className="chip">
+                          {year}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <label className="checkbox">
                   <input
                     type="checkbox"
@@ -749,7 +845,7 @@ export function EventWorkspace({
                       })
                     }
                   />
-                  Require an invitation to register
+                  Require a personal invitation to register
                 </label>
               </fieldset>
 

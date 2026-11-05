@@ -128,12 +128,13 @@ export const COMPLAINT_STATUS_LABELS: Record<ComplaintStatus, string> = {
 export const QUIZ_MODES = ["TOP_N", "FIRST_QUALIFIED"] as const;
 export type QuizMode = (typeof QUIZ_MODES)[number];
 
-export const QUIZ_STATUSES = ["DRAFT", "PUBLISHED", "CLOSED"] as const;
+export const QUIZ_STATUSES = ["DRAFT", "PUBLISHED", "PAUSED", "CLOSED"] as const;
 export type QuizStatus = (typeof QUIZ_STATUSES)[number];
 
 export const QUIZ_STATUS_LABELS: Record<QuizStatus, string> = {
   DRAFT: "Draft",
   PUBLISHED: "Open for attempts",
+  PAUSED: "Paused by coordinators",
   CLOSED: "Closed",
 };
 

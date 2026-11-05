@@ -91,6 +91,12 @@ async function promoteNext(tx: Tx, eventId: string, actorId: string): Promise<st
  * Participant withdrawal. Allowed until the event starts; after that the seat
  * was held and the coordinator must decide. Cancelling revokes the pass in the
  * same transaction so a withdrawn participant cannot still scan in.
+ *
+ * A withdrawal is *not* a life sentence. The row is kept as CANCELLED so the
+ * roster, the pass audit and the waitlist arithmetic stay intact, but the phone
+ * stops showing it and `register()` reclaims the same row if the student comes
+ * back — see `reclaim()` in service.ts. Refusing a returning student forever is
+ * how a "leave" button turns into a "you cannot change your mind" button.
  */
 export async function withdraw(
   auth: AuthContext,

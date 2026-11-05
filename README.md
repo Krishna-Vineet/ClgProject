@@ -2,7 +2,7 @@
 
 Campus event operations for frequent short events: plan → permissions → resources → publish → register → verify → issues.
 
-**Status:** production hardening. The full flow — permissions, resources, approvals, publication, registration, signed passes, scanning, complaints and reports — runs end to end on one connected codebase. The current round hardens the API (idempotency, maintenance, structured logs, proxy-aware rate limits), turns every create/edit form into a dialog, and adds search, audit, setup guidance and export/calendar links. 410 API tests pass (`bun run test`; five need the `btree_gist` exclusion constraint and only run on a database that has it).
+**Status:** production hardening. The full flow — permissions, resources, approvals, publication, registration, signed passes, scanning, complaints and reports — runs end to end on one connected codebase. The current round hardens the API (idempotency, maintenance, structured logs, proxy-aware rate limits), turns every create/edit form into a dialog, and adds search, audit, setup guidance and export/calendar links. 421 API tests pass (`bun run test`; five need the `btree_gist` exclusion constraint and only run on a database that has it).
 
 **Audience split:** the website is management-only. Students (college and outside) use the mobile app; the event’s own coordinators and faculty scan with their normal login; there is no student web portal. An account with no staff role and no club membership is told to use the app.
 

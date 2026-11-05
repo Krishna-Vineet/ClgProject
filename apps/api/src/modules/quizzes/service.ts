@@ -257,25 +257,62 @@ export async function upsertQuiz(
   });
 }
 
+/**
+ * Open, pause, resume or close a quiz.
+ *
+ * The window is the truth: a quiz is only attemptable between `opensAt` and
+ * `closesAt`. Inside that window the coordinator's only lever is pause — it stops
+ * new starts and nothing else, so the people already answering are not robbed of
+ * the minutes they were promised. Outside the window the status does not matter:
+ * before `opensAt` nobody may start, after `closesAt` nobody may start or submit.
+ *
+ * Every transition is reversible except the ones the clock makes for us. Closing
+ * explicitly is still possible (a coordinator may want to stop a quiz early for
+ * good), but a quiz that was closed by hand can be reopened while its window is
+ * still open — that is the bug this replaces.
+ */
 export async function setStatus(
   quizId: string,
-  status: "PUBLISHED" | "CLOSED",
+  status: "PUBLISHED" | "PAUSED" | "CLOSED",
   audit?: AuditContext,
 ) {
   const quiz = await loadQuiz(quizId);
+  const { db } = getDb();
+  const now = new Date();
+
   if (status === "PUBLISHED") {
-    if (quiz.status !== "DRAFT")
-      throw new ApiError("INVALID_STATE_TRANSITION", "Only a draft quiz can be published.");
+    // Opening (or reopening) is only possible when a question paper exists.
     const questions = await loadQuestions(quizId);
     if (questions.length === 0)
-      throw new ApiError("VALIDATION_ERROR", "Add at least one question before publishing.");
-    const { db } = getDb();
-    const [event] = await db.select().from(events).where(eq(events.id, quiz.eventId)).limit(1);
-    if (!event || !["READY", "PUBLISHED", "LIVE"].includes(event.status))
-      throw new ApiError("INVALID_STATE_TRANSITION", "Publish the event before opening its quiz.");
+      throw new ApiError("VALIDATION_ERROR", "Add at least one question before opening a quiz.");
+    if (quiz.status === "PUBLISHED") return quiz;
+    if (quiz.status === "DRAFT" || quiz.status === "CLOSED") {
+      const [event] = await db.select().from(events).where(eq(events.id, quiz.eventId)).limit(1);
+      if (!event || !["READY", "PUBLISHED", "LIVE"].includes(event.status))
+        throw new ApiError(
+          "INVALID_STATE_TRANSITION",
+          "Publish the event before opening its quiz.",
+        );
+    }
+    if (now > quiz.closesAt)
+      throw new ApiError(
+        "INVALID_STATE_TRANSITION",
+        "This quiz's close time has passed. Extend the close time before reopening it.",
+      );
   }
+
+  if (status === "PAUSED") {
+    if (quiz.status !== "PUBLISHED")
+      throw new ApiError("INVALID_STATE_TRANSITION", "Only an open quiz can be paused.");
+    if (now < quiz.opensAt || now > quiz.closesAt)
+      throw new ApiError(
+        "INVALID_STATE_TRANSITION",
+        "This quiz is outside its open window, so there is nothing to pause.",
+      );
+  }
+
   if (status === "CLOSED" && quiz.status === "CLOSED") return quiz;
-  const { db } = getDb();
+
   return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(quizzes)
@@ -283,6 +320,7 @@ export async function setStatus(
       .where(eq(quizzes.id, quizId))
       .returning();
     // Closing ends any attempt still running so nobody gains extra time.
+    // Pausing deliberately does not: a pause pauses *entry*, not the clock.
     if (status === "CLOSED") {
       await tx
         .update(quizAttempts)
@@ -291,7 +329,12 @@ export async function setStatus(
     }
     if (audit)
       await insertAudit(tx, audit, {
-        action: status === "PUBLISHED" ? "QUIZ_PUBLISHED" : "QUIZ_CLOSED",
+        action:
+          status === "PUBLISHED"
+            ? "QUIZ_PUBLISHED"
+            : status === "PAUSED"
+              ? "QUIZ_PAUSED"
+              : "QUIZ_CLOSED",
         entityType: "quiz",
         entityId: quizId,
         eventId: quiz.eventId,
@@ -299,6 +342,25 @@ export async function setStatus(
       });
     return updated;
   });
+}
+
+/**
+ * The effective state of a quiz right now, from the clock *and* the flag.
+ *
+ * Stored status alone lies: a PUBLISHED quiz whose close time has passed is
+ * closed, and a DRAFT/PUBLISHED quiz before its open time is not open. Both the
+ * participant view and the coordinator view read this so they cannot disagree.
+ */
+export function quizPhase(
+  quiz: { status: string; opensAt: Date; closesAt: Date },
+  now: Date = new Date(),
+): "DRAFT" | "BEFORE_OPEN" | "OPEN" | "PAUSED" | "WINDOW_CLOSED" | "CLOSED" {
+  if (quiz.status === "DRAFT") return "DRAFT";
+  if (quiz.status === "CLOSED") return "CLOSED";
+  if (now > quiz.closesAt) return "WINDOW_CLOSED";
+  if (now < quiz.opensAt) return "BEFORE_OPEN";
+  if (quiz.status === "PAUSED") return "PAUSED";
+  return "OPEN";
 }
 
 // ── Participant: attempt ────────────────────────────────────────────────────
@@ -360,7 +422,11 @@ export async function participantView(auth: AuthContext, eventId: string) {
           queuePosition: registration.queuePosition,
         }
       : null,
-    windowOpen: quiz.status === "PUBLISHED" && now >= quiz.opensAt && now <= quiz.closesAt,
+    // One derived state for the phone to branch on. `windowOpen` only means "a
+    // fresh attempt may start now"; it is false while paused, which is exactly
+    // what the phone needs to show "paused by coordinators" instead of "closed".
+    phase: quizPhase(quiz, now),
+    windowOpen: quizPhase(quiz, now) === "OPEN",
   };
 }
 
@@ -382,12 +448,9 @@ export async function startAttempt(auth: AuthContext, eventId: string, audit?: A
       "VALIDATION_ERROR",
       "This quiz is not part of the event's admission process.",
     );
-  if (quiz.status !== "PUBLISHED")
-    throw new ApiError("EVENT_NOT_OPEN", "This quiz is not open for attempts.");
-
   const now = new Date();
-  if (now < quiz.opensAt || now > quiz.closesAt)
-    throw new ApiError("EVENT_NOT_OPEN", "The quiz window is not open right now.");
+  if (now < quiz.opensAt) throw new ApiError("EVENT_NOT_OPEN", "The quiz has not opened yet.");
+  if (now > quiz.closesAt) throw new ApiError("EVENT_NOT_OPEN", "The quiz window has closed.");
 
   const questions = await loadQuestions(quiz.id);
   if (questions.length === 0)
@@ -399,6 +462,15 @@ export async function startAttempt(auth: AuthContext, eventId: string, audit?: A
       .from(quizAttempts)
       .where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, auth.user.id)))
       .limit(1);
+    // A pause stops new people joining; it never freezes someone already in the
+    // middle of an attempt, whose clock is running regardless.
+    if (!existing && quiz.status === "PAUSED")
+      throw new ApiError(
+        "EVENT_NOT_OPEN",
+        "The coordinators have paused this quiz. Your attempt has not started; try again when they resume it.",
+      );
+    if (!existing && quiz.status !== "PUBLISHED")
+      throw new ApiError("EVENT_NOT_OPEN", "This quiz is not open for attempts.");
     if (existing) {
       if (existing.status === "SUBMITTED")
         throw new ApiError("CONFLICT", "You have already submitted this quiz.");
@@ -501,7 +573,9 @@ export async function submitAttempt(
     }
     const now = new Date();
     // A submission after the deadline is recorded as expired and scores nothing.
-    const late = attempt.expiresAt < now || quiz.status !== "PUBLISHED" || now > quiz.closesAt;
+    // Only the clock can end an attempt. A coordinator's pause does not, and a
+    // quiz closed by hand expires running attempts (see setStatus).
+    const late = attempt.expiresAt < now || now > quiz.closesAt || quiz.status === "CLOSED";
     if (late) {
       await tx
         .update(quizAttempts)
@@ -701,8 +775,14 @@ export async function allocate(quizId: string, note: string | undefined, audit?:
       "VALIDATION_ERROR",
       "First-to-qualify allocates each seat on submission; there is nothing to run.",
     );
-  if (quiz.status !== "CLOSED")
-    throw new ApiError("INVALID_STATE_TRANSITION", "Close the quiz before allocating seats.");
+  // Allocation ranks finished attempts, so it needs the window to be over — or
+  // the quiz closed by hand. A live quiz could still gain a higher scorer, and
+  // allocating early would hand a seat to someone who is about to be overtaken.
+  if (quizPhase(quiz) !== "WINDOW_CLOSED" && quiz.status !== "CLOSED")
+    throw new ApiError(
+      "INVALID_STATE_TRANSITION",
+      "Wait for the quiz window to close (or close it yourself) before allocating seats.",
+    );
   if (quiz.allocatedAt)
     throw new ApiError("CONFLICT", "Seats have already been allocated for this quiz.");
 

@@ -197,6 +197,15 @@ export function QuizScreen({
         </>
       )}
 
+      {/* A pause mid-attempt is not an interruption: the student carries on, but
+          they should know why nobody new is joining and that they are not stuck. */}
+      {paper && view?.phase === "PAUSED" && (
+        <Note
+          message="Coordinators have paused this quiz for new starters. Your attempt is still running — finish and submit before your timer ends."
+          tone="warn"
+        />
+      )}
+
       {/* ── Result ─────────────────────────────────────────────────────── */}
       {!paper && result && (
         <Card title={result.expired ? "Time ran out" : "Your result"}>
@@ -277,13 +286,23 @@ export function QuizScreen({
 
       {!paper && quiz && !attempt && (
         <>
-          {view?.windowOpen ? (
+          {/*
+            Three different situations used to share one message. A paused quiz is
+            not a closed one: the student can still get in, so tell them who to
+            ask and that their chance has not gone.
+          */}
+          {view?.phase === "PAUSED" ? (
+            <Note
+              message="The coordinators have paused this quiz. You cannot start right now — contact your club faculty or lead, and try again once it resumes."
+              tone="warn"
+            />
+          ) : view?.windowOpen ? (
             <Button label="Start my attempt" busy={busy} onPress={start} testID="start-quiz" />
           ) : (
             <Note
               message={
-                quiz.status === "CLOSED"
-                  ? "This quiz is closed. You did not start an attempt in time."
+                view?.phase === "WINDOW_CLOSED" || quiz.status === "CLOSED"
+                  ? "This quiz has closed. You did not start an attempt in time."
                   : `The quiz opens ${when(quiz.opensAt, timeZone)}.`
               }
               tone="neutral"

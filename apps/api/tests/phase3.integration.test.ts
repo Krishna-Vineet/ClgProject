@@ -298,14 +298,17 @@ describe("phase 3 events", () => {
     expect(holds[0]?.status).toBe("HELD");
     expect(holds[0]?.holdExpiresAt).not.toBeNull();
 
-    // A submitted event is frozen.
-    const frozen = await req(
+    // A submitted event accepts small fixes in place — the approvals it already
+    // has stay valid, because nothing that was approved actually changed.
+    const inPlace = await req(
       "PATCH",
       `/api/v1/events/${ids.event}`,
       { expectedRevision: 1, capacity: 60 },
       tokens.lead,
     );
-    expect(frozen.status).toBe(409);
+    expect(inPlace.status).toBe(200);
+    expect(inPlace.json.data.status).toBe("PENDING_APPROVALS");
+    expect(inPlace.json.data.currentRevision).toBe(1);
   });
 
   test("overlapping resource request for the same unit fails with RESOURCE_CONFLICT", async () => {
@@ -860,6 +863,51 @@ describe("phase 3 escalation", () => {
 });
 
 describe("phase 3 revisions and cancellation", () => {
+  test("editing the schedule or venue on a live event becomes a draft revision", async () => {
+    // This is the whole point of the split: a title fix applies silently, but a
+    // change to what was approved cannot ride on the old approval.
+    const fresh = await req(
+      "POST",
+      "/api/v1/events",
+      eventBody(ids.club as string, 21),
+      tokens.lead,
+    );
+    expect(fresh.status).toBe(201);
+    const eventId = fresh.json.data.id as string;
+    const submitted = await req(
+      "POST",
+      `/api/v1/events/${eventId}/submit`,
+      {
+        expectedRevision: 1,
+        requests: [
+          { type: "ORGANIZE", title: "Organize the moved event", assignedApproverId: ids.faculty },
+        ],
+      },
+      tokens.lead,
+    );
+    expect(submitted.status).toBe(200);
+
+    const moved = await req(
+      "PATCH",
+      `/api/v1/events/${eventId}`,
+      { expectedRevision: 1, venueSummary: "Main auditorium" },
+      tokens.lead,
+    );
+    expect(moved.status).toBe(200);
+    expect(moved.json.data.status).toBe("DRAFT");
+    expect(moved.json.data.currentRevision).toBe(2);
+    expect(moved.json.data.venueSummary).toBe("Main auditorium");
+
+    // The superseded bundle is retired, so the old approval cannot publish it.
+    const bundle = await req(
+      "GET",
+      `/api/v1/events/${eventId}/approval-bundle`,
+      undefined,
+      tokens.lead,
+    );
+    expect(bundle.json.data.bundle).toBeNull();
+  });
+
   test("critical change after publish creates a new draft revision and keeps history", async () => {
     const revise = await req(
       "POST",

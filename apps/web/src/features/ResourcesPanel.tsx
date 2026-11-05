@@ -222,16 +222,41 @@ function CalendarView() {
     setWeekStart((current) => addDays(current, delta * 7));
   }
 
+  /**
+   * Show the booking card just above the pointer, clamped to the viewport.
+   *
+   * Anchoring to the button's rectangle put the card wherever the cell happened
+   * to be, so it often covered the thing you were pointing at. Following the
+   * cursor keeps it out of the way, and the clamp means a booking in the last
+   * column never pushes the card off the right edge or under the bottom bar.
+   */
   function showTip(
     event: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
     row: CalendarRow,
     booking: Booking,
   ) {
-    const rect = event.currentTarget.getBoundingClientRect();
     const width = 304;
-    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
-    const below = rect.bottom + 10;
-    const top = below + 210 > window.innerHeight ? Math.max(12, rect.top - 218) : below;
+    const height = 210;
+    // A focus event has no pointer, so fall back to the element's own box.
+    const pointer =
+      "clientX" in event && (event.clientX !== 0 || event.clientY !== 0)
+        ? { x: event.clientX, y: event.clientY }
+        : (() => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            return { x: rect.left + rect.width / 2, y: rect.top };
+          })();
+    const margin = 12;
+    const gap = 14;
+    const left = Math.min(
+      Math.max(margin, pointer.x - width / 2),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+    // Above the cursor. If there is no room above, below it — still clamped.
+    const above = pointer.y - height - gap;
+    const top =
+      above >= margin
+        ? above
+        : Math.min(pointer.y + gap, Math.max(margin, window.innerHeight - height - margin));
     setTip({ row, booking, left, top });
   }
 
@@ -380,6 +405,7 @@ function CalendarView() {
                               type="button"
                               className={`week-booking ${booking.status.toLowerCase()}`}
                               onMouseEnter={(event) => showTip(event, row, booking)}
+                              onMouseMove={(event) => showTip(event, row, booking)}
                               onFocus={(event) => showTip(event, row, booking)}
                               onMouseLeave={() => setTip(null)}
                               onBlur={() => setTip(null)}

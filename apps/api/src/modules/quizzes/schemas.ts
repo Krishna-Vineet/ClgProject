@@ -42,7 +42,13 @@ export const createQuizSchema = z
 
 export const updateQuizSchema = createQuizSchema;
 
-export const setQuizStatusSchema = z.object({ status: z.enum(["PUBLISHED", "CLOSED"]) }).strict();
+/**
+ * DRAFT is absent on purpose: a quiz is created as a draft and only ever leaves
+ * it via the open/close-window rules. PAUSED is the reversible middle state.
+ */
+export const setQuizStatusSchema = z
+  .object({ status: z.enum(["PUBLISHED", "PAUSED", "CLOSED"]) })
+  .strict();
 
 export const allocateSchema = z.object({ note: z.string().trim().max(500).optional() }).strict();
 

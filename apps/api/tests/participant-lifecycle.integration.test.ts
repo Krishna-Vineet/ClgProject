@@ -230,6 +230,55 @@ describe("withdrawal and waitlist promotion", () => {
     expect(again.json.data.promotedRegistrationId).toBeNull();
   });
 
+  test("a withdrawn place disappears from the student's list but can be claimed again", async () => {
+    const { db } = getDb();
+    const eventId = await makeEvent(`rejoin-${rnd()}`, "FCFS", 2);
+    const first = await register(eventId, "a");
+    expect(first.json.data.registration.status).toBe("CONFIRMED");
+
+    await req("POST", `/api/v1/events/${eventId}/withdraw`, {}, tokens.a);
+
+    // Gone from the phone: a cancelled registration is not something you hold.
+    const mine = await req("GET", "/api/v1/me/registrations?limit=100", undefined, tokens.a);
+    const listed = mine.json.data.items.filter((r: { eventId: string }) => r.eventId === eventId);
+    expect(listed).toHaveLength(0);
+
+    // ...and the detail screen offers Register again rather than "closed".
+    const view = await req("GET", `/api/v1/events/${eventId}/participant`, undefined, tokens.a);
+    expect(view.json.data.registration).toBeNull();
+
+    // Seats remain, so the rules permit it.
+    const again = await register(eventId, "a");
+    expect(again.status).toBe(201);
+    expect(again.json.data.alreadyRegistered).toBe(false);
+    expect(again.json.data.registration.status).toBe("CONFIRMED");
+
+    // The same row was reused (one row per student per event), history intact,
+    // and the pass that was revoked on withdrawal works again.
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(eq(registrations.eventId, eventId), eq(registrations.userId, ids.a as string)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(first.json.data.registration.id);
+    expect(rows[0]?.cancelledAt).toBeNull();
+    const row = rows[0];
+    if (!row) throw new Error("registration row missing");
+    const [pass] = await db.select().from(passes).where(eq(passes.registrationId, row.id));
+    expect(pass?.revokedAt).toBeNull();
+  });
+
+  test("re-registering stops when the seats are gone, without granting a seat out of thin air", async () => {
+    const eventId = await makeEvent(`rejoinfull-${rnd()}`, "FCFS", 1);
+    await register(eventId, "b");
+    const a = await register(eventId, "a");
+    expect(a.json.data.registration.status).toBe("WAITLISTED");
+    await req("POST", `/api/v1/events/${eventId}/withdraw`, {}, tokens.a);
+    const again = await register(eventId, "a");
+    expect(again.json.data.registration.status).toBe("WAITLISTED");
+    expect(again.json.data.registration.queuePosition).toBe(1);
+  });
+
   test("a non-participant cannot withdraw from an event they never joined", async () => {
     const res = await req("POST", `/api/v1/events/${ids.promoEvent}/withdraw`, {}, tokens.outsider);
     expect(res.status).toBe(404);

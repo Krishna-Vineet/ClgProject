@@ -192,7 +192,8 @@ export function ClubsPanel() {
         `/clubs/${selected.id}/candidates${query({ q: facultyQ.trim(), limit: 10, role: "FACULTY" })}`,
       );
       setFacultyCandidates(res.items);
-      if (res.items.length === 0) return "No matching faculty accounts.";
+      if (res.items.length === 0)
+        return "No faculty, HOD/Dean or admin account matches that search. Try part of a name or an email address.";
     });
   }
 
@@ -556,7 +557,8 @@ export function ClubsPanel() {
               <h3>Club faculty</h3>
               <p className="hint">
                 Faculty in this club help run its events, approve its requests and scan access QRs
-                at its gates. Only the department&apos;s HOD/Dean or Admin can add or remove them.
+                at its gates. Faculty, the department&apos;s HOD/Dean and Admin all appear here —
+                only those roles may add or remove them.
               </p>
               <div className="toolbar">
                 <Field label="Search faculty">

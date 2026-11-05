@@ -54,6 +54,11 @@ const envSchema = z
     // statement that waits on a lock forever turns one bad deploy into a full
     // outage, because the pool drains and every later request queues behind it.
     REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
+    // How long a statement may wait for a lock before giving up. Well under
+    // REQUEST_TIMEOUT_MS on purpose: a request that loses a lock race should
+    // come back in a second with "retry", not sit for twenty seconds and then
+    // report a timeout that says nothing about what happened.
+    DB_LOCK_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(3_000),
     // Reserved for a future Neon Auth integration. CampusOps currently uses its own auth.
     NEON_AUTH_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 

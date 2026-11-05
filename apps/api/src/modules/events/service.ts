@@ -6,6 +6,7 @@ import {
   checkPublishable,
   eligibilityPolicySchema,
   evaluateEligibility,
+  requiresRevision,
   summarizeBundle,
   validateBundleComposition,
   validateEventWindow,
@@ -39,6 +40,7 @@ import {
   eventRevisions,
   files,
   quizzes,
+  registrations,
   resourceReservations,
   resourceUnits,
   roleAssignments,
@@ -115,6 +117,8 @@ async function assertOwnedBanner(ownerId: string, fileId: string | null | undefi
   if (file.status !== "READY")
     throw new ApiError("VALIDATION_ERROR", "Finish the banner upload before attaching it.");
 }
+
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["db"]["transaction"]>[0]>[0];
 
 /** Quiz admission only works when a matching quiz is attached. */
 const QUIZ_MODE_FOR: Record<string, "TOP_N" | "FIRST_QUALIFIED"> = {
@@ -212,6 +216,25 @@ export async function createEvent(
   }
 }
 
+/** Seats already promised. An in-place capacity edit may not strand them. */
+async function confirmedCount(tx: Tx, eventId: string): Promise<number> {
+  const [row] = await tx
+    .select({ n: count() })
+    .from(registrations)
+    .where(and(eq(registrations.eventId, eventId), eq(registrations.status, "CONFIRMED")));
+  return row?.n ?? 0;
+}
+
+/** Has anyone acted on this event yet? Changing the rules after that is unfair. */
+async function hasRegistrations(tx: Tx, eventId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: registrations.id })
+    .from(registrations)
+    .where(eq(registrations.eventId, eventId))
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function updateEvent(
   auth: AuthContext,
   eventId: string,
@@ -220,18 +243,15 @@ export async function updateEvent(
 ) {
   const { db } = getDb();
   return db.transaction(async (tx) => {
-    const [event] = await tx.select().from(events).where(eq(events.id, eventId)).for("update");
+    let [event] = await tx.select().from(events).where(eq(events.id, eventId)).for("update");
     if (!event) throw new ApiError("NOT_FOUND", "Event not found.");
     if (!isClubCoordinator(auth, event.clubId))
       throw new ApiError(
         "FORBIDDEN",
         "Only this event's club coordinators can change it. Oversight can review and decide approvals.",
       );
-    if (event.status !== "DRAFT")
-      throw new ApiError(
-        "INVALID_STATE_TRANSITION",
-        "A submitted event is frozen. Use /revisions to create a new draft revision.",
-      );
+    if (event.status === "COMPLETED" || event.status === "CANCELLED")
+      throw new ApiError("INVALID_STATE_TRANSITION", "A finished event cannot be edited.");
     if (event.currentRevision !== input.expectedRevision)
       throw new ApiError("CONFLICT", "The event changed since you opened it. Reload and retry.", {
         currentRevision: event.currentRevision,
@@ -259,6 +279,51 @@ export async function updateEvent(
         `The attached quiz is ${linkedQuiz.mode}; ${nextAdmission} needs ${expectedQuizMode}.`,
       );
     if (input.bannerFileId !== undefined) await assertOwnedBanner(auth.user.id, input.bannerFileId);
+
+    // Which keys did the client actually send? An absent key is not a change, and
+    // treating it as one would send a title fix back through approvals.
+    const attempted = Object.keys(input).filter((key) => key !== "expectedRevision");
+
+    // A change to an approved fact cannot be applied silently to a published
+    // event, but making the coordinator go and find a "Revise" button first is
+    // just a second step for the same intent. Do it here: the revision is
+    // created, then the edit lands on the new draft.
+    const revisionForced = event.status !== "DRAFT" && requiresRevision(attempted);
+    if (revisionForced) {
+      await supersedeAndDraft(tx, event, auth, "Coordinator changed the schedule or venue.", audit);
+      // Re-read under the same lock: the revision bumped the row.
+      const [revised] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, eventId))
+        .for("update")
+        .limit(1);
+      if (!revised) throw new ApiError("INTERNAL_ERROR", "Revision creation failed.");
+      event = revised;
+    }
+
+    if (event.status !== "DRAFT") {
+      // Small live fixes still have to fit the event as it stands.
+      if (
+        input.capacity !== undefined &&
+        ["PUBLISHED", "LIVE"].includes(event.status) &&
+        input.capacity < (await confirmedCount(tx, eventId))
+      )
+        throw new ApiError(
+          "VALIDATION_ERROR",
+          "Capacity cannot drop below the number of students already confirmed. Remove someone from the roster first.",
+        );
+      if (
+        input.admissionMode !== undefined &&
+        input.admissionMode !== event.admissionMode &&
+        (await hasRegistrations(tx, eventId))
+      )
+        throw new ApiError(
+          "INVALID_STATE_TRANSITION",
+          "People have already applied under the current admission mode. Changing how seats are decided needs a new revision.",
+          { requiresRevision: true },
+        );
+    }
 
     const changed = changedCriticalFields(
       snapshotOf(event) as unknown as Record<string, unknown>,
@@ -557,6 +622,91 @@ export async function submitEvent(
 }
 
 /**
+ * Retire the open approval bundle, release its holds, and move the event to a
+ * fresh draft revision.
+ *
+ * Shared by the explicit "Revise event" action and by any in-place edit that
+ * touches an approved fact, so both produce exactly the same trace: one new
+ * revision, the old bundle superseded, nothing left holding a room.
+ */
+async function supersedeAndDraft(
+  tx: Tx,
+  event: typeof events.$inferSelect,
+  auth: AuthContext,
+  note: string | undefined,
+  audit?: AuditContext,
+) {
+  const eventId = event.id;
+  // A revision starts a fresh approval cycle. Retire the open bundle and
+  // release anything it was holding so the new submission is not blocked by
+  // stale reservations from the previous attempt.
+  const priorBundles = await tx
+    .select()
+    .from(approvalBundles)
+    .where(and(eq(approvalBundles.eventId, eventId), isNull(approvalBundles.supersededAt)));
+  for (const prior of priorBundles) {
+    const priorRequests = await tx
+      .select()
+      .from(approvalRequests)
+      .where(eq(approvalRequests.bundleId, prior.id));
+    if (priorRequests.length)
+      await tx
+        .update(resourceReservations)
+        .set({
+          status: "RELEASED",
+          releasedAt: new Date(),
+          releaseReason: "Superseded by a new event revision.",
+        })
+        .where(
+          and(
+            inArray(
+              resourceReservations.requestId,
+              priorRequests.map((r) => r.id),
+            ),
+            inArray(resourceReservations.status, [...ACTIVE_RESERVATION_STATUSES]),
+          ),
+        );
+    await tx
+      .update(approvalBundles)
+      .set({ supersededAt: new Date() })
+      .where(eq(approvalBundles.id, prior.id));
+  }
+
+  const nextRevision = event.currentRevision + 1;
+  const [updated] = await tx
+    .update(events)
+    .set({
+      status: "DRAFT",
+      currentRevision: nextRevision,
+      readyAt: null,
+      submittedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(events.id, eventId))
+    .returning();
+  if (!updated) throw new ApiError("INTERNAL_ERROR", "Revision creation failed.");
+  await tx.insert(eventRevisions).values({
+    eventId,
+    revision: nextRevision,
+    snapshot: snapshotOf(updated),
+    changedFields: [],
+    note: note ?? "New draft revision.",
+    createdBy: auth.user.id,
+  });
+  if (audit)
+    await insertAudit(tx, audit, {
+      action: "EVENT_REVISION_CREATED",
+      entityType: "event",
+      entityId: eventId,
+      clubId: event.clubId,
+      eventId,
+      before: { status: event.status, revision: event.currentRevision },
+      after: { status: "DRAFT", revision: nextRevision },
+    });
+  return updated;
+}
+
+/**
  * Critical change after submission: create a new draft revision, keep history.
  * Existing approvals stay attached to the old revision until re-submission.
  */
@@ -581,74 +731,7 @@ export async function createRevision(
       throw new ApiError("CONFLICT", "The event is already a draft. Edit it directly.");
     if (event.currentRevision !== input.expectedRevision)
       throw new ApiError("CONFLICT", "The event changed since you opened it. Reload and retry.");
-
-    // A revision starts a fresh approval cycle. Retire the open bundle and
-    // release anything it was holding so the new submission is not blocked by
-    // stale reservations from the previous attempt.
-    const priorBundles = await tx
-      .select()
-      .from(approvalBundles)
-      .where(and(eq(approvalBundles.eventId, eventId), isNull(approvalBundles.supersededAt)));
-    for (const prior of priorBundles) {
-      const priorRequests = await tx
-        .select()
-        .from(approvalRequests)
-        .where(eq(approvalRequests.bundleId, prior.id));
-      if (priorRequests.length)
-        await tx
-          .update(resourceReservations)
-          .set({
-            status: "RELEASED",
-            releasedAt: new Date(),
-            releaseReason: "Superseded by a new event revision.",
-          })
-          .where(
-            and(
-              inArray(
-                resourceReservations.requestId,
-                priorRequests.map((r) => r.id),
-              ),
-              inArray(resourceReservations.status, [...ACTIVE_RESERVATION_STATUSES]),
-            ),
-          );
-      await tx
-        .update(approvalBundles)
-        .set({ supersededAt: new Date() })
-        .where(eq(approvalBundles.id, prior.id));
-    }
-
-    const nextRevision = event.currentRevision + 1;
-    const [updated] = await tx
-      .update(events)
-      .set({
-        status: "DRAFT",
-        currentRevision: nextRevision,
-        readyAt: null,
-        submittedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventId))
-      .returning();
-    if (!updated) throw new ApiError("INTERNAL_ERROR", "Revision creation failed.");
-    await tx.insert(eventRevisions).values({
-      eventId,
-      revision: nextRevision,
-      snapshot: snapshotOf(updated),
-      changedFields: [],
-      note: input.note ?? "New draft revision.",
-      createdBy: auth.user.id,
-    });
-    if (audit)
-      await insertAudit(tx, audit, {
-        action: "EVENT_REVISION_CREATED",
-        entityType: "event",
-        entityId: eventId,
-        clubId: event.clubId,
-        eventId,
-        before: { status: event.status, revision: event.currentRevision },
-        after: { status: "DRAFT", revision: nextRevision },
-      });
-    return updated;
+    return supersedeAndDraft(tx, event, auth, input.note, audit);
   });
 }
 

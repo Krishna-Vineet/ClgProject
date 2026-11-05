@@ -667,4 +667,94 @@ describe("quiz editing guards", () => {
     );
     expect(late.status).toBe(409);
   });
+
+  test("a pause blocks new starts, lets a running attempt finish, and can be resumed", async () => {
+    const { db } = getDb();
+    const eventId = await makeEvent(`pause-${rnd()}`, "QUIZ_TOP_N", 5);
+    const created = await req(
+      "PUT",
+      `/api/v1/events/${eventId}/quiz`,
+      { mode: "TOP_N", ...window(), durationSeconds: 600, questions: QUESTIONS },
+      tokens.lead,
+    );
+    const quizId = created.json.data.id;
+    await req("PATCH", `/api/v1/quizzes/${quizId}/status`, { status: "PUBLISHED" }, tokens.lead);
+
+    // Somebody already answering when the pause lands.
+    const running = await req("POST", `/api/v1/events/${eventId}/quiz/attempts`, {}, tokens.s1);
+    expect(running.status).toBe(201);
+
+    const paused = await req(
+      "PATCH",
+      `/api/v1/quizzes/${quizId}/status`,
+      { status: "PAUSED" },
+      tokens.lead,
+    );
+    expect(paused.status).toBe(200);
+    expect(paused.json.data.status).toBe("PAUSED");
+
+    // A pause is not a close: the attempt in flight was not expired.
+    const [open] = await db.select().from(quizAttempts).where(eq(quizAttempts.quizId, quizId));
+    expect(open?.status).toBe("IN_PROGRESS");
+
+    // ...and that participant can still submit while nobody new can join.
+    const blocked = await req("POST", `/api/v1/events/${eventId}/quiz/attempts`, {}, tokens.s2);
+    expect(blocked.status).toBe(409);
+    expect(blocked.json.error.message).toContain("paused");
+    const submitted = await req(
+      "POST",
+      `/api/v1/events/${eventId}/quiz/attempts/submit`,
+      { answers: {} },
+      tokens.s1,
+    );
+    expect(submitted.status).toBe(200);
+
+    // The participant view says why, rather than pretending the quiz closed.
+    const view = await req("GET", `/api/v1/events/${eventId}/quiz/me`, undefined, tokens.s2);
+    expect(view.json.data.phase).toBe("PAUSED");
+    expect(view.json.data.windowOpen).toBe(false);
+
+    // Resume is repeatable, and a closed-by-hand quiz can be reopened while the
+    // window is still open — the one-way door is gone.
+    await req("PATCH", `/api/v1/quizzes/${quizId}/status`, { status: "PUBLISHED" }, tokens.lead);
+    const resumed = await req("GET", `/api/v1/events/${eventId}/quiz/me`, undefined, tokens.s2);
+    expect(resumed.json.data.phase).toBe("OPEN");
+    expect(resumed.json.data.windowOpen).toBe(true);
+  });
+
+  test("a quiz whose close time has passed reports WINDOW_CLOSED and refuses starts", async () => {
+    // Published while the window was open, then time moved on. The stored status
+    // is still PUBLISHED, and the clock alone has to close it.
+    const { db } = getDb();
+    const eventId = await makeEvent(`window-${rnd()}`, "QUIZ_TOP_N", 5);
+    const created = await req(
+      "PUT",
+      `/api/v1/events/${eventId}/quiz`,
+      { mode: "TOP_N", ...window(), durationSeconds: 600, questions: QUESTIONS },
+      tokens.lead,
+    );
+    const quizId = created.json.data.id;
+    const published = await req(
+      "PATCH",
+      `/api/v1/quizzes/${quizId}/status`,
+      { status: "PUBLISHED" },
+      tokens.lead,
+    );
+    expect(published.status).toBe(200);
+    await db
+      .update(quizzes)
+      .set({
+        opensAt: new Date(Date.now() - 7_200_000),
+        closesAt: new Date(Date.now() - 3_600_000),
+      })
+      .where(eq(quizzes.id, quizId));
+
+    const view = await req("GET", `/api/v1/events/${eventId}/quiz/me`, undefined, tokens.s3);
+    expect(view.json.data.quiz.status).toBe("PUBLISHED");
+    expect(view.json.data.phase).toBe("WINDOW_CLOSED");
+    expect(view.json.data.windowOpen).toBe(false);
+    const start = await req("POST", `/api/v1/events/${eventId}/quiz/attempts`, {}, tokens.s3);
+    expect(start.status).toBe(409);
+    expect(start.json.error.message).toContain("closed");
+  });
 });

@@ -1315,6 +1315,15 @@ export const operations: Operation[] = [
     auth: true,
   },
   {
+    method: "post",
+    path: "/me/announcements/read-all",
+    tag: "Announcements",
+    summary: "Mark every visible announcement read",
+    description:
+      "Used by the phone when the inbox is opened: seeing the list is reading it. Visibility is rebuilt from the same predicate as the inbox, so nothing outside it is ever marked.",
+    auth: true,
+  },
+  {
     method: "get",
     path: "/me/devices",
     tag: "Notifications",

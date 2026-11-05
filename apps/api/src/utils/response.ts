@@ -6,6 +6,13 @@ export function ok<T>(c: Context, data: T, status = 200) {
 }
 
 export function fail(c: Context, error: ApiError) {
+  // Tell a client *when* to come back, so "retry" is actionable instead of a
+  // guess. Only for the transient families; a validation error is not a wait.
+  if (error.code === "DATABASE_BUSY" || error.code === "DATABASE_CONNECTION_LOST") {
+    c.header("Retry-After", "2");
+  } else if (error.code === "REQUEST_TIMEOUT") {
+    c.header("Retry-After", "5");
+  }
   return c.json(
     {
       error: {

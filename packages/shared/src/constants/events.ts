@@ -5,6 +5,7 @@ export const EVENT_TEMPLATES = [
   "HACKATHON",
   "PLACEMENT_DRIVE",
   "SPORTS",
+  "COMPETITION",
   "CUSTOM",
 ] as const;
 export type EventTemplate = (typeof EVENT_TEMPLATES)[number];
@@ -83,6 +84,7 @@ export const EVENT_TEMPLATE_LABELS: Record<EventTemplate, string> = {
   HACKATHON: "Hackathon",
   PLACEMENT_DRIVE: "Placement drive",
   SPORTS: "Sports",
+  COMPETITION: "Competition",
   CUSTOM: "Custom event",
 };
 

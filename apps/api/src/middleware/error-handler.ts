@@ -30,6 +30,18 @@ function databaseError(err: unknown): ApiError | null {
     return new ApiError("RESOURCE_CONFLICT", "That booking overlaps an existing reservation.");
 
   const code = pgCode(err);
+  // A lock wait that ran out of budget. Postgres says nothing was changed, so
+  // this is the most retryable failure in the system — and the most common cause
+  // of a mystery timeout is another request (or a migration) holding the table.
+  if (code === "55P03")
+    return new ApiError(
+      "DATABASE_BUSY",
+      "Another change to this data was still in progress, so this request gave up waiting. Nothing was saved; please try again in a moment.",
+    );
+  // statement_timeout fires as 57014 and reaches here as a timeout. It is a 504,
+  // but the message should say what to do rather than leave the caller guessing.
+  if (code === "57014")
+    return new ApiError("REQUEST_TIMEOUT", "This request took too long. Please retry.");
   if (code === "22P02" || code === "22007" || code === "22008")
     return new ApiError("VALIDATION_ERROR", "Invalid identifier or date format.");
   if (code === "40001" || code === "40P01")

@@ -1,4 +1,6 @@
 import {
+  ADMISSION_MODES,
+  ADMISSION_MODE_LABELS,
   EVENT_AUDIENCE_LABELS,
   EVENT_STATUSES,
   EVENT_TEMPLATES,
@@ -818,13 +820,22 @@ export function CoordinatorPanel({
             <option value="INVITED_ONLY">Invited only</option>
           </select>
         </Field>
-        <Field label="Admission">
+        <Field
+          label="Admission"
+          hint="Quiz modes need a quiz attached before the event can be submitted."
+        >
           <select
             value={form?.admissionMode ?? ""}
             onChange={(e) => setForm((f) => (f ? { ...f, admissionMode: e.target.value } : f))}
           >
-            <option value="FCFS">First come, first served</option>
-            <option value="MANUAL">Manual selection</option>
+            {/* The creator picks from the same list the editor offers. Hiding the
+                quiz modes here only meant people created the event as FCFS and
+                then had to come back and change it. */}
+            {ADMISSION_MODES.map((m) => (
+              <option key={m} value={m}>
+                {ADMISSION_MODE_LABELS[m]}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Capacity">

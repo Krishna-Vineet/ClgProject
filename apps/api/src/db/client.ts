@@ -26,6 +26,10 @@ const POOLED_OPTIONS = {
   connection: {
     statement_timeout: env.REQUEST_TIMEOUT_MS,
     idle_in_transaction_session_timeout: env.REQUEST_TIMEOUT_MS * 2,
+    // A lock wait is the one failure a request can usually just retry. Bounding
+    // it separately from statement_timeout is what turns a 20-second 504 into a
+    // one-second 503 with Retry-After — see middleware/error-handler.
+    lock_timeout: env.DB_LOCK_TIMEOUT_MS,
   },
 } as const;
 

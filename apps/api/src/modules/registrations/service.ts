@@ -4,16 +4,18 @@ import {
   eligibilityPolicySchema,
   evaluateEligibility,
 } from "@campusops/shared";
-import { and, count, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { getDb } from "../../db/client";
 import {
   events,
+  clubMemberships,
   clubs,
   eventInvitations,
   passes,
   registrationHistory,
   registrations,
   studentProfiles,
+  users,
 } from "../../db/schema";
 import type { AuthContext } from "../../middleware/auth";
 import { ApiError } from "../../utils/api-error";
@@ -53,9 +55,12 @@ export async function register(auth: AuthContext, eventId: string, audit?: Audit
         .from(registrations)
         .where(and(eq(registrations.eventId, eventId), eq(registrations.userId, auth.user.id)))
         .limit(1);
-      if (existing) {
-        if (existing.status === "CANCELLED" || existing.status === "REJECTED")
-          throw new ApiError("CONFLICT", "This registration is closed. Contact the coordinator.");
+      // A withdrawn seat is free to be claimed again. The row is reused rather
+      // than duplicated (the (event, user) unique index allows only one) and the
+      // seat is re-derived from capacity at this moment, not from the old row.
+      if (existing && existing.status !== "CANCELLED") {
+        if (existing.status === "REJECTED")
+          throw new ApiError("CONFLICT", "This application was rejected. Contact the coordinator.");
         const [pass] = await tx
           .select({ id: passes.id })
           .from(passes)
@@ -125,35 +130,73 @@ export async function register(auth: AuthContext, eventId: string, audit?: Audit
         }
       }
 
-      const [registration] = await tx
-        .insert(registrations)
-        .values({
-          eventId,
-          userId: auth.user.id,
-          status,
-          admissionModeSnapshot: event.admissionMode,
-          eligibilitySnapshot: { policy, result: eligibility, hasInvitation },
-          eventRevision: event.currentRevision,
-          queuePosition,
-          ...(status === "CONFIRMED" ? { confirmedAt: now } : {}),
-        })
-        .returning();
+      // Re-registering after giving up a place reuses the withdrawn row. Every
+      // decision that depended on "when did they join" is reset from *now*: the
+      // seat is re-derived above, the revision snapshot and eligibility are
+      // re-recorded, and the queue position is recomputed. The row id is the only
+      // thing that survives, and only so the (event, user) history stays one line.
+      const reclaiming = existing?.status === "CANCELLED";
+      const [registration] = reclaiming
+        ? await tx
+            .update(registrations)
+            .set({
+              status,
+              admissionModeSnapshot: event.admissionMode,
+              eligibilitySnapshot: { policy, result: eligibility, hasInvitation },
+              eventRevision: event.currentRevision,
+              queuePosition,
+              appliedAt: now,
+              cancelledAt: null,
+              withdrawnBy: null,
+              withdrawalReason: null,
+              decidedBy: null,
+              decidedAt: null,
+              rejectionReason: null,
+              confirmedAt: status === "CONFIRMED" ? now : null,
+              promotedFromWaitlist: false,
+              updatedAt: now,
+            })
+            .where(eq(registrations.id, existing.id))
+            .returning()
+        : await tx
+            .insert(registrations)
+            .values({
+              eventId,
+              userId: auth.user.id,
+              status,
+              admissionModeSnapshot: event.admissionMode,
+              eligibilitySnapshot: { policy, result: eligibility, hasInvitation },
+              eventRevision: event.currentRevision,
+              queuePosition,
+              ...(status === "CONFIRMED" ? { confirmedAt: now } : {}),
+            })
+            .returning();
       if (!registration) throw new ApiError("INTERNAL_ERROR", "Registration failed.");
       await tx.insert(registrationHistory).values({
         registrationId: registration.id,
-        fromStatus: null,
+        fromStatus: reclaiming ? "CANCELLED" : null,
         toStatus: status,
         actorId: auth.user.id,
-        reason: quizAdmission
-          ? "Registered; seat depends on the quiz result."
-          : "Registered from the mobile app.",
+        reason: reclaiming
+          ? "Registered again after giving up a place."
+          : quizAdmission
+            ? "Registered; seat depends on the quiz result."
+            : "Registered from the mobile app.",
       });
       let passId: string | null = null;
       if (status === "CONFIRMED") {
-        const [pass] = await tx
-          .insert(passes)
-          .values({ registrationId: registration.id })
-          .returning({ id: passes.id });
+        // A reclaimed seat brings its old pass back: un-revoke it rather than
+        // inserting a second row (passes.registration_id is unique).
+        const [pass] = reclaiming
+          ? await tx
+              .update(passes)
+              .set({ revokedAt: null })
+              .where(eq(passes.registrationId, registration.id))
+              .returning({ id: passes.id })
+          : await tx
+              .insert(passes)
+              .values({ registrationId: registration.id })
+              .returning({ id: passes.id });
         passId = pass?.id ?? null;
       }
       if (audit)
@@ -189,7 +232,10 @@ export async function mine(auth: AuthContext, limit = 25, offset = 0) {
     .innerJoin(events, eq(events.id, registrations.eventId))
     .innerJoin(clubs, eq(clubs.id, events.clubId))
     .leftJoin(passes, eq(passes.registrationId, registrations.id))
-    .where(eq(registrations.userId, auth.user.id))
+    // A withdrawn place is gone from the student's list: it is not a
+    // registration they hold any more, and showing a cancelled one next to
+    // "Register" on the same event reads as a bug.
+    .where(and(eq(registrations.userId, auth.user.id), ne(registrations.status, "CANCELLED")))
     .orderBy(desc(registrations.appliedAt), desc(registrations.id))
     .limit(limit + 1)
     .offset(offset);
@@ -207,19 +253,61 @@ export async function mine(auth: AuthContext, limit = 25, offset = 0) {
   };
 }
 
+/**
+ * The people a participant can actually ring: the club's lead(s) and its faculty.
+ *
+ * Name, role and phone only. A student who is stuck at the gate does not need the
+ * coordinator's email address or account id, and a phone number is the one thing
+ * that resolves a problem in the ninety seconds before an event starts.
+ */
+async function clubContacts(clubId: string) {
+  const { db } = getDb();
+  const rows = await db
+    .select({
+      userId: users.id,
+      fullName: users.fullName,
+      phone: users.phone,
+      clubRole: clubMemberships.clubRole,
+    })
+    .from(clubMemberships)
+    .innerJoin(users, eq(users.id, clubMemberships.userId))
+    .where(
+      and(
+        eq(clubMemberships.clubId, clubId),
+        eq(clubMemberships.isActive, true),
+        inArray(clubMemberships.clubRole, ["LEAD", "FACULTY"]),
+        eq(users.status, "ACTIVE"),
+      ),
+    )
+    // Faculty first: they are the ones who can approve an exception, then leads.
+    .orderBy(asc(clubMemberships.clubRole), asc(users.fullName));
+  return rows.map((r) => ({
+    id: r.userId,
+    fullName: r.fullName,
+    role: r.clubRole === "FACULTY" ? ("FACULTY" as const) : ("LEAD" as const),
+    phone: r.phone,
+  }));
+}
+
 /** One round trip for the mobile event-detail screen. */
 export async function participantView(auth: AuthContext, eventId: string) {
   const event = await getVisibleEvent(auth, eventId);
   const { db } = getDb();
   const [club] = await db
-    .select({ name: clubs.name })
+    .select({ name: clubs.name, departmentId: clubs.departmentId })
     .from(clubs)
     .where(eq(clubs.id, event.clubId))
     .limit(1);
   const [registration] = await db
     .select()
     .from(registrations)
-    .where(and(eq(registrations.eventId, eventId), eq(registrations.userId, auth.user.id)))
+    .where(
+      and(
+        eq(registrations.eventId, eventId),
+        eq(registrations.userId, auth.user.id),
+        ne(registrations.status, "CANCELLED"),
+      ),
+    )
     .limit(1);
   const [taken] = await db
     .select({ n: count() })
@@ -229,6 +317,9 @@ export async function participantView(auth: AuthContext, eventId: string) {
   return {
     event,
     club: { id: event.clubId, name: club?.name ?? "Campus club" },
+    // Who to ring when something is wrong. Students only ever get a name and a
+    // number here; no email, no account ids.
+    contacts: await clubContacts(event.clubId),
     registration: registration ?? null,
     eligibility,
     confirmedCount: taken?.n ?? 0,

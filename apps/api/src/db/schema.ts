@@ -47,6 +47,7 @@ export const eventTemplate = pgEnum("event_template", [
   "HACKATHON",
   "PLACEMENT_DRIVE",
   "SPORTS",
+  "COMPETITION",
   "CUSTOM",
 ]);
 export const eventStatus = pgEnum("event_status", [
@@ -133,7 +134,7 @@ export const complaintStatus = pgEnum("complaint_status", [
   "CLOSED",
 ]);
 export const quizMode = pgEnum("quiz_mode", ["TOP_N", "FIRST_QUALIFIED"]);
-export const quizStatus = pgEnum("quiz_status", ["DRAFT", "PUBLISHED", "CLOSED"]);
+export const quizStatus = pgEnum("quiz_status", ["DRAFT", "PUBLISHED", "PAUSED", "CLOSED"]);
 export const quizAttemptStatus = pgEnum("quiz_attempt_status", [
   "IN_PROGRESS",
   "SUBMITTED",

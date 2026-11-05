@@ -59,6 +59,11 @@ myAnnouncementRoutes.post("/:id/read", async (c) =>
   ok(c, await service.markRead(c.get("auth"), c.req.param("id"))),
 );
 
+/** Clear the whole unread badge at once, for "I have seen the inbox". */
+myAnnouncementRoutes.post("/read-all", async (c) =>
+  ok(c, await service.markAllRead(c.get("auth"))),
+);
+
 /** Device registration for push, mounted under /me/devices. */
 export const myDeviceRoutes = new Hono();
 myDeviceRoutes.use("*", authenticate, requireActiveAccount);

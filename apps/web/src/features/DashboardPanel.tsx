@@ -246,18 +246,21 @@ export const DashboardPanel = memo(function DashboardPanel({
                 data.work.verificationPending +
                 data.work.openComplaints}
             </div>
+            {/* Number above its label, each pair in one element: the three
+                columns used to read as a row of bare digits ("1 0 2") with the
+                words detached underneath, so the tile meant nothing at a glance. */}
             <div className="stat-split">
               <span>
                 <b>{data.work.approvalsPending}</b>
-                approvals
+                <em>approvals</em>
               </span>
               <span>
                 <b>{data.work.verificationPending}</b>
-                IDs
+                <em>IDs</em>
               </span>
               <span>
                 <b>{data.work.openComplaints}</b>
-                issues
+                <em>issues</em>
               </span>
             </div>
           </div>
@@ -437,7 +440,7 @@ export const DashboardPanel = memo(function DashboardPanel({
           {tick > 1 ? " · live" : ""}
         </span>
         <span>
-          CampusOps · <b>Made by Vineet</b>
+          CampusOps · <b>Event operations</b>
         </span>
       </div>
     </>

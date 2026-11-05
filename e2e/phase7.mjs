@@ -68,7 +68,7 @@ async function openEvent(page, search, title) {
   await nav(page, "Events");
   const back = page.locator('button:has-text("All events")');
   if ((await back.count()) > 0 && (await back.first().isVisible())) await back.first().click();
-  const searchBox = page.locator('input[placeholder="Search events…"]');
+  const searchBox = page.locator('input[placeholder="Search this list by title…"]');
   await searchBox.waitFor();
   await searchBox.fill(search);
   const card = page.locator("button.event-card", { hasText: title }).first();
@@ -94,7 +94,7 @@ try {
   const lead = await session("coding.lead@demo.campusops.local");
   await openEvent(lead.page, "Placement Drive", "Placement Drive · Backend Engineer");
   ok("coordinator opens a quiz-admission event workspace");
-  if ((await lead.page.locator('input[placeholder="Search events…"]').count()) === 0)
+  if ((await lead.page.locator('input[placeholder="Search this list by title…"]').count()) === 0)
     ok("the event list gives way to the selected event");
   else throw new Error("the event list stayed beside the selected event");
 

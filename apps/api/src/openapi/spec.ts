@@ -74,7 +74,7 @@ function operationObject(op: Operation) {
       in: "header",
       required: false,
       description:
-        "Replays the original response for the same key and payload. A different payload with the same key returns 409 IDEMPOTENCY_CONFLICT.",
+        "Replays the original response for the same key and payload, with `Idempotent-Replay: true` on the replay. A different payload with the same key returns 409 IDEMPOTENCY_CONFLICT.",
       schema: { type: "string", minLength: 8, maxLength: 200 },
     });
   }

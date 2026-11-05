@@ -10,6 +10,7 @@
     "db:seed": "bun --filter @campusops/api db:seed",
     "db:check": "bun --filter @campusops/api db:check",
     "test": "bun --filter @campusops/api test",
+    "test:clients": "bun --filter @campusops/web test && bun --filter @campusops/mobile test",
     "typecheck": "bun run --filter @campusops/shared typecheck && bun run --filter @campusops/api typecheck && bun run --filter @campusops/web typecheck && bun run --filter @campusops/mobile typecheck",
     "lint": "biome check .",
     "format": "biome format --write .",
@@ -24,7 +25,7 @@
     "preview:mobile": "bun --no-env-file --env-file=.env.web run apps/mobile/serve-preview.mjs",
     "e2e:dashboard": "bun run e2e/dashboard.mjs",
     "admin:bootstrap": "bun --filter @campusops/api admin:bootstrap",
-    "check": "bun run lint && bun run typecheck",
+    "check": "bun run lint && bun run typecheck && bun run test:clients",
     "e2e:phase7": "bun run e2e/phase7.mjs",
     "start:api": "bun --filter @campusops/api start"
   },

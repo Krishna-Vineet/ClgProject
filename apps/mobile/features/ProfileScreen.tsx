@@ -22,6 +22,9 @@ import type { Challenge } from "../lib/types";
 
 export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
   const { me, config, signOut, reloadMe } = useSession();
+  // Whose installation this is. The product used to sign itself "Made by Vineet"
+  // on every screen; a student opening the app should see their college.
+  const institution = config?.institutionName ?? "your institution";
   const [changing, setChanging] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -296,7 +299,7 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
           disabled={busy}
         />
       </Card>
-      <Card title="About CampusOps">
+      <Card title={`About CampusOps at ${institution}`}>
         <Muted>
           The student side of the campus event desk: register, carry your pass, get told when
           something changes, and raise an issue without walking to the office.
@@ -327,7 +330,7 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
               color: colors.muted,
             }}
           >
-            Made by
+            Institution
           </Text>
           <Text
             style={{
@@ -338,7 +341,7 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
               letterSpacing: -0.3,
             }}
           >
-            Vineet
+            {institution}
           </Text>
         </View>
       </Card>

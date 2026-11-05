@@ -12,6 +12,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: "0.7.0",
   orientation: "portrait",
   scheme: "campusops",
+  /**
+   * The student app ships one theme: warm paper, on purpose. A light-only design
+   * must say so, or iOS renders system surfaces (alerts, keyboards, share sheets)
+   * dark against our light cards and the result is worse than either theme done
+   * properly. Declaring "light" keeps the native chrome consistent with the
+   * screens; a real dark palette is a separate piece of work, tracked in
+   * docs/mobile.md rather than half-implemented here.
+   */
   userInterfaceStyle: "light",
   ios: { supportsTablet: true, bundleIdentifier: "local.campusops.demo" },
   android: { package: "local.campusops.demo" },

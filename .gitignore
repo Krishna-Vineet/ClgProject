@@ -18,3 +18,10 @@ e2e/downloaded-report.pdf
 # Scenario state and generated artefacts (the PDF report in docs/ is committed).
 scripts/e2e/state.json
 scripts/e2e/*.pdf
+
+# Browser-walkthrough screenshots and download captures are regenerated on every
+# e2e run. They are evidence for one review, not source: committing 43 PNGs and a
+# stack of sample PDFs (5.7 MB) made every clone slower and turned each rerun into
+# a binary diff nobody can review. Run the suites to reproduce them locally.
+e2e/*.png
+e2e/downloads/

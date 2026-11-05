@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM"],
-    "types": ["react"],
+    "types": ["react", "bun"],
     "paths": { "@campusops/shared": ["../../packages/shared/src/index.ts"] }
   },
   "include": ["App.tsx", "index.ts", "app.config.ts", "components", "lib", "features"]

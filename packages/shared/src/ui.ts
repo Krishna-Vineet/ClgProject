@@ -8,6 +8,7 @@
 export * from "./constants/eligibility";
 export * from "./constants/events";
 export * from "./constants/operations";
+export * from "./constants/privacy";
 export * from "./constants/roles";
 export * from "./permissions/roles";
 export * from "./types/api";

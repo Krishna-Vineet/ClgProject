@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Lint/format | `bun run lint` | Biome rules across all workspaces | nothing |
 | Types | `bun run typecheck` | Strict TS in shared, API, web, mobile | nothing |
-| API unit + integration | `bun run test` | 260 tests: domain rules, auth/session/refresh reuse, roles/scope, approvals/escalation, resource exclusion, registrations race/waitlist, QR rules/scan/replay, complaints privacy, reports immutability, OpenAPI parity, dashboard scoping | `TEST_DATABASE_URL` (migrated + seeded) |
+| API unit + integration | `bun run test` | 410 tests: domain rules, auth/session/refresh-reuse-by-family, consent versioning, account export/delete, roles/scope, staff-directory scoping, approvals/escalation, resource exclusion, registrations race/waitlist, QR rules/scan/replay, complaints privacy, reports immutability, OpenAPI parity, dashboard scoping | `TEST_DATABASE_URL` (migrated + seeded) |
 | Web build | `bun run build:web` | Production bundle compiles; deterministic output | nothing |
 | Browser e2e (web) | `bun run e2e:all` | Dashboard, events lifecycle, approvals, admin, clubs, resources, verification, QR rules, complaint posters, reports — real Chromium against real API | API :8787 + web :5173 + `E2E_PASSWORD` |
 | Browser e2e (mobile) | `bun run e2e:mobile` | Exported mobile bundle: auth, events, passes, scanner, complaints, profile, signup fields, 390 px overflow | API + mobile preview :8081 + `E2E_PASSWORD` |
@@ -21,6 +21,8 @@ bun run db:migrate
 DATABASE_URL="$TEST_DATABASE_URL" bun run db:seed
 bun run test
 ```
+
+Five tests exercise real `EXCLUDE USING gist` constraints and skip-fail on a Postgres without `btree_gist`. They are the only reason a local run reports fewer passes than CI, which installs the extension.
 
 `apps/api/bunfig.toml` preloads `tests/setup.ts`, which forces `NODE_ENV=test`, points `DATABASE_URL` at `TEST_DATABASE_URL`, and enables demo email. Tests create their own rows with unique stamps; they never touch the dev database. **Never point `TEST_DATABASE_URL` at production.**
 

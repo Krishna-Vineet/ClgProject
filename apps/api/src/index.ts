@@ -8,9 +8,14 @@ import { log } from "./utils/logger";
 
 const app = createApp();
 
-// Refuse to serve against a schema that does not match the code. The runner is
-// idempotent and advisory-locked, so restarting an already-migrated database is
-// cheap; a fresh checkout applies the missing SQL before the first request.
+// Bring the schema up to date before serving. The runner is idempotent and
+// advisory-locked, so restarting an already-migrated database is cheap.
+//
+// A failed migration used to `process.exit(1)`. On a free host that means a
+// crash loop: the platform restarts, the database is still waking up, and the
+// service never comes back — when the honest state is "degraded but answering",
+// with /health/ready reporting 503 until the database arrives. Exit only when a
+// supervisor is actually there to act on it (outside production).
 if (env.AUTO_MIGRATE) {
   if (env.DATABASE_URL || env.DATABASE_URL_POOLED || env.DATABASE_DIRECT_URL) {
     try {
@@ -25,8 +30,12 @@ if (env.AUTO_MIGRATE) {
         error: err instanceof Error ? err.message : String(err),
         cause: err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined,
         fix: "Check the database URL and run `bun run db:migrate` once from the repository root.",
+        consequence:
+          env.NODE_ENV === "production"
+            ? "Serving in degraded mode; /health/ready reports 503 until the schema is reachable."
+            : "Exiting so a local developer sees the failure immediately.",
       });
-      process.exit(1);
+      if (env.NODE_ENV !== "production") process.exit(1);
     }
   } else {
     log.warn("database_migrations_skipped", {

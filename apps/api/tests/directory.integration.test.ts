@@ -96,10 +96,27 @@ describe("staff directory", () => {
     expect(detail.json.data.items[0].phone).toContain("98111");
   });
 
-  test("HOD/Dean cannot read the institution-wide staff directory", async () => {
+  test("HOD/Dean reads the staff directory, narrowed to their own department", async () => {
+    // Administrators asked for the Administration page to be usable by an
+    // HOD/Dean for their own department. The route is no longer Admin-only, so
+    // this asserts the scope instead of the refusal: they get a 200 whose rows
+    // all belong to the department they hold a scoped role for.
     const token = await login("hoddean.cse@demo.campusops.local");
-    const res = await get("/admin/staff", token);
-    expect(res.status).toBe(403);
+    const res = await get("/admin/staff?limit=100", token);
+    expect(res.status).toBe(200);
+    const departments = new Set(
+      (res.json.data.items as Array<{ departmentId: string | null }>).map((i) => i.departmentId),
+    );
+    expect(departments.size).toBeGreaterThan(0);
+    expect(departments.has(null)).toBe(false);
+    expect(departments.size).toBe(1);
+  });
+
+  test("HOD/Dean is still refused roles, suspension and the audit log", async () => {
+    const token = await login("hoddean.cse@demo.campusops.local");
+    expect((await get("/admin/users?limit=5", token)).status).toBe(403);
+    expect((await get("/admin/audit?limit=5", token)).status).toBe(403);
+    expect((await get("/admin/setup", token)).status).toBe(403);
   });
 });
 

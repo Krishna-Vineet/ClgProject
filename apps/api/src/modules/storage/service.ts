@@ -34,6 +34,61 @@ const ALLOWED: Record<FilePurpose, string[]> = {
   COMPLAINT_ATTACHMENT: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
 };
 
+/**
+ * Identify a file by its leading bytes.
+ *
+ * The upload path used to trust the client twice: the presigned URL pinned the
+ * `Content-Type` the client asked for, and `complete` compared the object's
+ * content type against that same client-supplied value. An attacker could upload
+ * HTML and call it `image/png`, and both checks agreed with each other. Sniffing
+ * the first bytes is the only check that does not believe the client.
+ */
+const SIGNATURES: Array<{ mime: string; bytes: number[]; offset?: number }> = [
+  { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
+  { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  // RIFF....WEBP
+  { mime: "image/webp", bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },
+  { mime: "application/pdf", bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] },
+];
+
+/** Returns the sniffed MIME type, or null when the bytes match no allowed type. */
+export function sniffMimeType(prefix: Uint8Array): string | null {
+  for (const signature of SIGNATURES) {
+    const start = signature.offset ?? 0;
+    if (prefix.length < start + signature.bytes.length) continue;
+    const matches = signature.bytes.every((byte, index) => prefix[start + index] === byte);
+    if (matches) return signature.mime;
+  }
+  return null;
+}
+
+/**
+ * Read the first bytes of an upload and compare them with what it claims to be.
+ * Office documents are zip containers and cannot be told apart by magic bytes, so
+ * they are accepted on their declared type (sheets are only ever downloaded by
+ * their owner, never served inline).
+ */
+async function assertContentMatches(
+  client: S3Client,
+  bucket: string,
+  key: string,
+  declared: string,
+) {
+  if (declared.startsWith("application/vnd.openxmlformats") || declared === "text/csv") return;
+  const head = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key, Range: "bytes=0-15" }),
+  );
+  const body = head.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+  const bytes = body?.transformToByteArray ? await body.transformToByteArray() : null;
+  if (!bytes) throw new ApiError("VALIDATION_ERROR", "The uploaded object could not be verified.");
+  const sniffed = sniffMimeType(bytes);
+  if (sniffed !== declared)
+    throw new ApiError(
+      "VALIDATION_ERROR",
+      `The uploaded file is not a ${declared} document. Its contents do not match the file type you selected.`,
+    );
+}
+
 function s3() {
   const cfg = storageConfig();
   if (!cfg)
@@ -114,6 +169,8 @@ export async function completeUpload(ownerId: string, fileId: string, audit?: Au
     throw new ApiError("VALIDATION_ERROR", "Uploaded object size does not match the request.");
   if (head.ContentType && head.ContentType !== file.mimeType)
     throw new ApiError("VALIDATION_ERROR", "Uploaded object type does not match the request.");
+  // The header above is what the client asked for. Verify the bytes too.
+  await assertContentMatches(client, cfg.bucket, file.objectKey, file.mimeType);
   return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(files)

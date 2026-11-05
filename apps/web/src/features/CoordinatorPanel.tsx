@@ -581,11 +581,17 @@ export function CoordinatorPanel({
               </p>
             </div>
             <div className="events-head-actions">
+              {/* This searches the event's TITLE inside the workspace. The box in
+                  the top bar searches events, clubs and people across the whole
+                  console. Two inputs with the same placeholder is why people typed
+                  a club name here and got "nothing matches". Each now says what it
+                  searches, and this one is labelled for screen readers too. */}
               <label className="search">
                 <Icon name="search" size={14} />
                 <input
                   type="search"
-                  placeholder="Search events…"
+                  placeholder="Search this list by title…"
+                  aria-label="Search this event list by title"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />

@@ -50,6 +50,7 @@ function useScreenIn(tab: Tab) {
 
 function Shell() {
   const { me, config, bootError, retryBoot } = useSession();
+  const isOrganiser = Boolean(me?.clubMemberships.length);
   const [tab, setTab] = useState<Tab>("events");
   const [locationId, setLocationId] = useState<string | null>(null);
   const [quizTarget, setQuizTarget] = useState<{ id: string; title: string } | null>(null);
@@ -153,7 +154,12 @@ function Shell() {
       <View style={s.nav} accessibilityRole="tablist">
         {tabs.map((item) => {
           const active = tab === item.id;
-          const isScan = item.id === "scan";
+          // The centre Scan orb is the organisers' primary action. A student has
+          // no events to scan, but still reads complaint posters with the same
+          // camera, so the tab stays as an ordinary item instead of being the
+          // loudest thing on their screen — and instead of being removed, which
+          // would strand the "scan a location QR" entry point.
+          const isScan = item.id === "scan" && isOrganiser;
           return (
             <Pressable
               key={item.id}

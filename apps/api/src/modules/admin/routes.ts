@@ -12,7 +12,13 @@ import {
   roleAssignments,
   users,
 } from "../../db/schema";
-import { authenticate, requireActiveAccount, requireRole } from "../../middleware/auth";
+import {
+  authenticate,
+  requireActiveAccount,
+  requireRole,
+  requireStaffDirectoryAdmin,
+  staffDirectoryScope,
+} from "../../middleware/auth";
 import { rateLimit } from "../../middleware/rate-limit";
 import { parseJson, parseQuery } from "../../middleware/validate";
 import { ok } from "../../utils/response";
@@ -128,10 +134,6 @@ adminRoutes.get("/audit", async (c) => {
   });
 });
 
-adminRoutes.get("/staff", async (c) =>
-  ok(c, await service.listStaff(parseQuery(c, schemas.listStaffSchema))),
-);
-
 adminRoutes.get("/users", async (c) =>
   ok(c, await service.listUsers(parseQuery(c, schemas.listUsersSchema))),
 );
@@ -206,4 +208,50 @@ adminRoutes.get("/jobs", async (c) => {
       skipped: byStatus.get("SKIPPED") ?? 0,
     },
   });
+});
+
+/**
+ * The staff directory, reachable by Admin and by an HOD/Dean scoped to their own
+ * department. It is a separate Hono instance because `adminRoutes` carries a
+ * blanket `requireRole("ADMIN")` guard; mounting this one first in app.ts lets
+ * the narrower scope check apply instead. Every handler re-derives the scope from
+ * the authenticated session, never from the request.
+ */
+export const staffDirectoryRoutes = new Hono();
+staffDirectoryRoutes.use("*", authenticate, requireActiveAccount, requireStaffDirectoryAdmin);
+
+/**
+ * The staff directory. Admin sees the institution; an HOD/Dean sees the members
+ * of their own department only. Both reach this route, so the check is a scope
+ * check rather than `requireRole("ADMIN")`.
+ */
+staffDirectoryRoutes.get("/staff", requireStaffDirectoryAdmin, async (c) =>
+  ok(
+    c,
+    await service.listStaffForScope(
+      staffDirectoryScope(c.get("auth")),
+      parseQuery(c, schemas.listStaffSchema),
+    ),
+  ),
+);
+
+/** Programmes the caller may administer, already narrowed to their scope. */
+staffDirectoryRoutes.get("/programs", requireStaffDirectoryAdmin, async (c) =>
+  ok(c, {
+    items: await service.listProgramsForScope(staffDirectoryScope(c.get("auth"))),
+  }),
+);
+
+/** Edit a staff member's details. HOD/Dean: contact fields in their department only. */
+staffDirectoryRoutes.patch("/staff/:id", requireStaffDirectoryAdmin, async (c) => {
+  const scope = staffDirectoryScope(c.get("auth"));
+  const input =
+    scope === null
+      ? await parseJson(c, schemas.updateStaffSchema)
+      : await parseJson(c, schemas.updateStaffContactSchema);
+  const actor = c.get("auth").user.id;
+  return ok(
+    c,
+    await service.updateStaffMember(actor, c.req.param("id"), input, scope, auditContext(c)),
+  );
 });

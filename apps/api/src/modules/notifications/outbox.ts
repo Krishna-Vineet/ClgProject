@@ -1,6 +1,6 @@
 import { TIER_ROLE } from "@campusops/shared";
 import type { ApprovalTier } from "@campusops/shared";
-import { and, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { env } from "../../config/env";
 import type { DbClient } from "../../db/client";
 import { getDb } from "../../db/client";
@@ -50,7 +50,17 @@ export async function queueNotification(tx: Tx, input: QueueNotificationInput) {
           eq(users.status, "ACTIVE"),
         ),
       )
+      // A cap without an ORDER BY means arbitrary recipients: the same five
+      // admins get every escalation, or a different five on each restart. Longest
+      // tenure first is stable, and the ids break ties so it is deterministic.
+      .orderBy(asc(users.createdAt), asc(users.id))
       .limit(env.OUTBOX_FANOUT_MAX);
+    // Say out loud when the fan-out was truncated: silently notifying the first
+    // fifty holders of a tier is indistinguishable from notifying all of them.
+    if (holders.length === env.OUTBOX_FANOUT_MAX)
+      console.warn(
+        `notification fan-out truncated at OUTBOX_FANOUT_MAX=${env.OUTBOX_FANOUT_MAX} for tier ${input.fallbackTier}`,
+      );
     recipients.push(...holders);
   }
   if (recipients.length === 0) return [];

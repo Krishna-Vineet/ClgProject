@@ -7,6 +7,7 @@
     "dev": "bun run vite --host 0.0.0.0",
     "build": "bun run tsc --noEmit && bun run vite build",
     "preview": "bun run vite preview --host 0.0.0.0",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/bun": "^1.1.14",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

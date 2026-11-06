@@ -18,6 +18,7 @@ import {
 import { api, errorMessage } from "../lib/api";
 import { registerForPush } from "../lib/push";
 import { useSession } from "../lib/session";
+import { useStorageAvailability } from "../lib/storage";
 import type { Challenge } from "../lib/types";
 
 export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
@@ -35,6 +36,11 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
   const [pushBusy, setPushBusy] = useState(false);
   const [phone, setPhone] = useState(me?.user.phone ?? "");
   const [phoneBusy, setPhoneBusy] = useState(false);
+  // One hook, both screens: the server is the only authority on this.
+  const storage = useStorageAvailability();
+  const storageEnabled = storage.enabled;
+  const storageReason =
+    storage.reason ?? "Secure uploads are unavailable until the administrator configures storage.";
 
   useEffect(() => {
     setPhone(me?.user.phone ?? "");
@@ -92,10 +98,7 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
       if (picked.canceled) return;
       const file = picked.assets[0];
       if (!file) throw new Error("Choose an image or PDF of your student ID proof.");
-      if (!config || config.storageMode !== "s3")
-        throw new Error(
-          "Secure file storage is not configured yet. Ask your administrator to enable storage.",
-        );
+      if (!storageEnabled) throw new Error(storageReason);
       const mimeType = file.mimeType ?? "application/octet-stream";
       const signed = await api<{
         fileId: string;
@@ -183,15 +186,10 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
               variant="ghost"
               onPress={() => void uploadIdProof()}
               busy={busy}
-              disabled={config?.storageMode !== "s3"}
+              disabled={!storageEnabled}
             />
           )}
-          {config?.storageMode !== "s3" && (
-            <Muted>
-              Secure uploads are unavailable until the administrator configures private object
-              storage.
-            </Muted>
-          )}
+          {!storageEnabled && <Muted>{storageReason}</Muted>}
           <Row label="Program" value={student.program ?? "—"} />
           <Row
             label="Graduation year"
@@ -307,7 +305,7 @@ export function ProfileScreen({ onComplaints }: { onComplaints: () => void }) {
         <Row label="Version" value="2.0" />
         <Row
           label="File storage"
-          value={config?.storageMode === "s3" ? "private, encrypted" : "not configured"}
+          value={storageEnabled ? "private, encrypted" : "not configured"}
         />
         <View
           style={{
@@ -373,6 +371,11 @@ export function PendingScreen() {
   const [pushBusy, setPushBusy] = useState(false);
   const [phone, setPhone] = useState(me?.user.phone ?? "");
   const [phoneBusy, setPhoneBusy] = useState(false);
+  // One hook, both screens: the server is the only authority on this.
+  const storage = useStorageAvailability();
+  const storageEnabled = storage.enabled;
+  const storageReason =
+    storage.reason ?? "Secure uploads are unavailable until the administrator configures storage.";
 
   useEffect(() => {
     setPhone(me?.user.phone ?? "");
@@ -423,10 +426,7 @@ export function PendingScreen() {
       if (picked.canceled) return;
       const file = picked.assets[0];
       if (!file) throw new Error("Choose an image or PDF of your student ID proof.");
-      if (config?.storageMode !== "s3")
-        throw new Error(
-          "Secure file storage is not configured yet. Ask your administrator to enable storage.",
-        );
+      if (!storageEnabled) throw new Error(storageReason);
       const mimeType = file.mimeType ?? "application/octet-stream";
       const signed = await api<{
         fileId: string;
@@ -493,14 +493,9 @@ export function PendingScreen() {
               variant="ghost"
               onPress={() => void uploadIdProof()}
               busy={busy}
-              disabled={config?.storageMode !== "s3"}
+              disabled={!storageEnabled}
             />
-            {config?.storageMode !== "s3" && (
-              <Muted>
-                Secure document uploads are unavailable until the administrator configures private
-                storage.
-              </Muted>
-            )}
+            {!storageEnabled && <Muted>{storageReason}</Muted>}
           </>
         )}
         {me.user.status === "PENDING_EMAIL" && (

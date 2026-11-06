@@ -301,9 +301,18 @@ export function StudentsPanel() {
               <dt>Phone</dt>
               <dd>{detail.phone ?? "—"}</dd>
               <dt>Roll number</dt>
-              <dd>{detail.profile.rollNumber ?? "—"}</dd>
-              <dt>College ID</dt>
-              <dd>{detail.profile.collegeIdNumber ?? "—"}</dd>
+              <dd>
+                {detail.profile.rollNumber ?? "—"}
+                {/* The roll number is the ID. Only show a separate college ID when
+                    one was actually recorded — a second "—" row told an operator
+                    nothing except that the product asks for two identifiers. */}
+                {detail.profile.collegeIdNumber &&
+                  detail.profile.collegeIdNumber !== detail.profile.rollNumber && (
+                    <span className="cell-sub">
+                      Also on file: college ID {detail.profile.collegeIdNumber}
+                    </span>
+                  )}
+              </dd>
               <dt>Department</dt>
               <dd>{deptName(detail.profile.departmentId, detail.departmentName)}</dd>
               <dt>Programme</dt>

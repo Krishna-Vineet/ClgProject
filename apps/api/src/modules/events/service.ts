@@ -6,6 +6,7 @@ import {
   checkPublishable,
   eligibilityPolicySchema,
   evaluateEligibility,
+  policyForSubject,
   requiresRevision,
   summarizeBundle,
   validateBundleComposition,
@@ -44,6 +45,7 @@ import {
   resourceReservations,
   resourceUnits,
   roleAssignments,
+  scanLogs,
   staffProfiles,
   studentProfiles,
   users,
@@ -119,6 +121,19 @@ async function assertOwnedBanner(ownerId: string, fileId: string | null | undefi
 }
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["db"]["transaction"]>[0]>[0];
+
+/**
+ * Does this event decide seats by hand?
+ *
+ * Two situations do: MANUAL admission anywhere, and any event that admits
+ * outsiders — a visitor from another college is a guest, and the organiser
+ * accepts or declines guests regardless of how seats are otherwise allocated.
+ * Keeping this in one place means "does this event have applications?" cannot
+ * drift between the roster, the notifications and the decision endpoint.
+ */
+export function admitsByApplication(audience: string, admissionMode: string): boolean {
+  return admissionMode === "MANUAL" || audience !== "COLLEGE_ONLY";
+}
 
 /** Quiz admission only works when a matching quiz is attached. */
 const QUIZ_MODE_FOR: Record<string, "TOP_N" | "FIRST_QUALIFIED"> = {
@@ -917,6 +932,80 @@ export async function cancelEvent(
   });
 }
 
+/**
+ * Delete a draft.
+ *
+ * A cancelled event is a record — students were told something and it did not
+ * happen. A draft is not: nobody has seen it, nobody has applied, no reviewer
+ * has been asked, no room is held. Leaving those in the list forever means the
+ * only way to tidy up a mistake is to keep a grower of half-finished events
+ * around, so a draft can be removed outright.
+ *
+ * The guard is deliberately strict: DRAFT only, no registrations of any status,
+ * and no scans. Anything that has been seen by someone else is cancelled, not
+ * erased. Approvals, revisions and resource links cascade from the event row.
+ */
+export async function deleteDraft(auth: AuthContext, eventId: string, audit?: AuditContext) {
+  const { db } = getDb();
+  return db.transaction(async (tx) => {
+    const [event] = await tx.select().from(events).where(eq(events.id, eventId)).for("update");
+    if (!event) throw new ApiError("NOT_FOUND", "Event not found.");
+    if (!isClubCoordinator(auth, event.clubId))
+      throw new ApiError(
+        "FORBIDDEN",
+        "Only this event's club coordinators can delete it. Oversight can review and decide approvals.",
+      );
+    if (event.status !== "DRAFT")
+      throw new ApiError(
+        "INVALID_STATE_TRANSITION",
+        `Only a draft can be deleted; this event is ${event.status}. Cancel it instead so its history survives.`,
+      );
+
+    // A draft should have neither, but "should" is not a guarantee: a submission
+    // that was sent back for changes is a draft, and it may already have
+    // applications from an earlier publish. Those people exist and were told
+    // something, so the deletion is refused rather than cascaded away.
+    const [registrationRow] = await tx
+      .select({ n: count() })
+      .from(registrations)
+      .where(eq(registrations.eventId, eventId));
+    if ((registrationRow?.n ?? 0) > 0)
+      throw new ApiError(
+        "INVALID_STATE_TRANSITION",
+        "People have already registered for this event, so it cannot be erased. Cancel it instead.",
+      );
+    const [scanRow] = await tx
+      .select({ n: count() })
+      .from(scanLogs)
+      .where(eq(scanLogs.eventId, eventId));
+    if ((scanRow?.n ?? 0) > 0)
+      throw new ApiError(
+        "INVALID_STATE_TRANSITION",
+        "This event has gate scans recorded and cannot be erased. Cancel it instead.",
+      );
+
+    if (audit) {
+      // Written before the delete: the audit row's own eventId reference is
+      // `set null`-safe only if the row exists at write time, and a deleted
+      // event's history should still name what was deleted.
+      await insertAudit(tx, audit, {
+        action: "EVENT_DELETED",
+        entityType: "event",
+        entityId: eventId,
+        clubId: event.clubId,
+        before: {
+          title: event.title,
+          status: event.status,
+          revision: event.currentRevision,
+          startsAt: event.startsAt,
+        },
+      });
+    }
+    await tx.delete(events).where(eq(events.id, eventId));
+    return { deleted: true, id: eventId, title: event.title };
+  });
+}
+
 export async function startEvent(auth: AuthContext, eventId: string, audit?: AuditContext) {
   const { db } = getDb();
   return db.transaction(async (tx) => {
@@ -1048,7 +1137,10 @@ export async function eligibilityPreview(auth: AuthContext, eventId: string) {
   const hasInvitation = Boolean(
     invite && (!invite.expiresAt || invite.expiresAt.getTime() > Date.now()),
   );
-  const policy = eligibilityPolicySchema.parse(event.eligibilityPolicy);
+  const policy = policyForSubject(
+    eligibilityPolicySchema.parse(event.eligibilityPolicy),
+    auth.user.accountType,
+  );
   const result = evaluateEligibility(policy, {
     accountType: auth.user.accountType,
     departmentId: student?.departmentId ?? staff?.departmentId ?? null,

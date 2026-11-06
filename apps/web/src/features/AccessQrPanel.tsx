@@ -22,11 +22,11 @@ import {
 } from "../components/feedback";
 import {
   Empty,
-  ErrorNote,
   Field,
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
@@ -66,6 +66,9 @@ type LogEntry = {
   checkpointName: string | null;
   scanner: { id: string; fullName: string };
   participantId: string | null;
+  participantName: string | null;
+  participantPhone: string | null;
+  participantEmail: string | null;
 };
 
 type Form = {
@@ -178,6 +181,8 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
   const [offset, setOffset] = useState(0);
   const [filter, setFilter] = useState({ checkpointId: "", result: "" });
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [form, setForm] = useState<Form>(() => blankForm(event));
   const [editing, setEditing] = useState<Checkpoint | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -264,7 +269,6 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
   const typeLocked = Boolean(editing && editing.uses > 0);
   return (
     <>
-      <ErrorNote message={error} />
       <div className="subtabs">
         {(
           [
@@ -276,6 +280,9 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
           <button
             key={key}
             type="button"
+            id={`qr-view-${key}`}
+            data-action="select-view"
+            aria-pressed={view === key}
             className={view === key ? "active" : "ghost"}
             onClick={() => setView(key)}
           >
@@ -295,6 +302,8 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
             {canManage && (
               <button
                 type="button"
+                id="qr-new"
+                data-action="new-qr"
                 onClick={() => {
                   setEditing(null);
                   setForm(blankForm(event));
@@ -331,7 +340,12 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                 </thead>
                 <tbody>
                   {checkpoints.map((cp) => (
-                    <tr key={cp.id}>
+                    // Each row owns its own buttons. They used to be three
+                    // identical <button> elements repeated per row, so every switch,
+                    // every Edit and every Delete on the page was indistinguishable
+                    // to a test, a screen reader's element list, and anything else
+                    // that addresses a control by identity. The id is the row's key.
+                    <tr key={cp.id} data-checkpoint-id={cp.id}>
                       <td>{cp.name}</td>
                       <td>
                         {QR_TYPE_LABELS[cp.qrType]}
@@ -358,7 +372,10 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                           <div className="row">
                             <button
                               type="button"
+                              id={`qr-toggle-${cp.id}`}
+                              data-action="toggle-qr"
                               className="ghost tiny"
+                              aria-label={`${cp.isActive ? "Switch off" : "Switch on"} ${cp.name}`}
                               disabled={action.busy}
                               onClick={() => void toggle(cp)}
                             >
@@ -366,7 +383,10 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                             </button>
                             <button
                               type="button"
+                              id={`qr-edit-${cp.id}`}
+                              data-action="edit-qr"
                               className="ghost tiny"
+                              aria-label={`Edit ${cp.name}`}
                               onClick={() => {
                                 setEditing(cp);
                                 setForm(editForm(cp, event));
@@ -377,7 +397,10 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                             </button>
                             <button
                               type="button"
+                              id={`qr-delete-${cp.id}`}
+                              data-action="delete-qr"
                               className="ghost tiny"
+                              aria-label={`Delete ${cp.name}`}
                               onClick={() => setConfirmDelete(cp)}
                             >
                               Delete
@@ -577,7 +600,7 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                 </thead>
                 <tbody>
                   {holders.map((h) => (
-                    <tr key={h.passId}>
+                    <tr key={h.passId} data-pass-id={h.passId}>
                       <td>{h.user.fullName}</td>
                       <td className="meta">{h.user.email}</td>
                       <td>{h.status.replace(/_/g, " ").toLowerCase()}</td>
@@ -592,7 +615,10 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                           {!h.revokedAt && (
                             <button
                               type="button"
+                              id={`pass-revoke-${h.passId}`}
+                              data-action="revoke-pass"
                               className="ghost tiny"
+                              aria-label={`Revoke the pass for ${h.user.fullName}`}
                               onClick={() => setConfirmRevoke(h)}
                             >
                               Revoke
@@ -654,6 +680,8 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                     <tr>
                       <th>When</th>
                       <th>QR</th>
+                      <th>Participant</th>
+                      <th>Phone</th>
                       <th>Outcome</th>
                       <th>Detail</th>
                       <th>Scanned by</th>
@@ -662,9 +690,25 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
                   </thead>
                   <tbody>
                     {log.items.map((entry) => (
-                      <tr key={entry.id}>
+                      <tr key={entry.id} data-scan-id={entry.id}>
                         <td className="meta">{formatWhen(entry.createdAt)}</td>
                         <td>{entry.checkpointName ?? "—"}</td>
+                        {/* A scan log is a record of people, not of codes: "who was
+                            this?" is the first question anyone asks at the gate, and
+                            it was the one column the table did not have. */}
+                        <td>
+                          {entry.participantName ?? <span className="meta">Unknown</span>}
+                          {entry.participantName && entry.participantEmail ? (
+                            <span className="cell-sub">{entry.participantEmail}</span>
+                          ) : null}
+                        </td>
+                        <td className="mono">
+                          {entry.participantPhone ? (
+                            <a href={`tel:${entry.participantPhone}`}>{entry.participantPhone}</a>
+                          ) : (
+                            <span className="meta">No number on file</span>
+                          )}
+                        </td>
                         <td>
                           <span className={`badge ${entry.result === "GRANTED" ? "good" : "bad"}`}>
                             {entry.result === "GRANTED" ? "Granted" : "Denied"}

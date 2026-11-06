@@ -2,7 +2,7 @@ import { GLOBAL_ROLE_LABELS } from "@campusops/shared/ui";
 import { useState } from "react";
 import { ConfirmDialog, useAction } from "../components/feedback";
 import { Icon } from "../components/icons";
-import { Card, Empty, Field, SuccessNote } from "../components/ui";
+import { Card, Empty, Field, useNotice } from "../components/ui";
 import { api, downloadBlob } from "../lib/api";
 import { useSession } from "../lib/session";
 
@@ -16,6 +16,7 @@ export function AccountPanel() {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  useNotice(deleteError, exportNotice);
 
   if (!me) return null;
 
@@ -205,7 +206,6 @@ export function AccountPanel() {
                 <Icon name="download" size={14} /> Download my data
               </button>
             </div>
-            <SuccessNote message={exportNotice} />
             <hr />
             <p className="meta">
               Deleting your account overwrites your name, email, phone and ID numbers and ends every

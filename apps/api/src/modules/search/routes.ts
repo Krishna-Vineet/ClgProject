@@ -1,9 +1,15 @@
-import { and, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb } from "../../db/client";
-import { clubMemberships, clubs, roleAssignments, users } from "../../db/schema";
-import { authenticate, hasRole, requireActiveAccount } from "../../middleware/auth";
+import { clubMemberships, clubs, roleAssignments, studentProfiles, users } from "../../db/schema";
+import {
+  type AuthContext,
+  authenticate,
+  departmentScope,
+  hasRole,
+  requireActiveAccount,
+} from "../../middleware/auth";
 import { parseQuery } from "../../middleware/validate";
 import { ok } from "../../utils/response";
 import { myManagedEvents } from "../events/service";
@@ -22,10 +28,93 @@ function roleRank(role: string) {
 }
 
 /**
+ * Who may this person find in the console search?
+ *
+ * The rule is "whoever you can open a profile for", and it has to be the same
+ * rule the destination pages use — otherwise search says "no such student" about
+ * someone the Students page lists two clicks away. That was the HOD's complaint.
+ *
+ *   Admin        everyone.
+ *   HOD/Dean     their department(s): students in them, plus any staff account.
+ *   Faculty      students in the departments they are scoped to (they can open a
+ *                student profile), plus themselves.
+ *   Anyone else  no people results. A club lead searches events and clubs; a
+ *                student has no business enumerating classmates from here.
+ */
+async function searchablePeople(
+  auth: AuthContext,
+  needle: string,
+  limit: number,
+): Promise<
+  Array<{ id: string; fullName: string; email: string; accountType: string; status: string }>
+> {
+  const { db } = getDb();
+  const byName = or(ilike(users.fullName, needle), ilike(users.email, needle));
+  if (hasRole(auth, "ADMIN")) {
+    return db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        accountType: users.accountType,
+        status: users.status,
+      })
+      .from(users)
+      .where(byName)
+      .orderBy(users.fullName)
+      .limit(limit);
+  }
+
+  const isHod = hasRole(auth, "HOD_DEAN");
+  const isFaculty = hasRole(auth, "FACULTY");
+  if (!isHod && !isFaculty) return [];
+
+  const scope = departmentScope(auth, isHod ? "HOD_DEAN" : "FACULTY");
+  if (scope.global) {
+    return db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        accountType: users.accountType,
+        status: users.status,
+      })
+      .from(users)
+      .where(byName)
+      .orderBy(users.fullName)
+      .limit(limit);
+  }
+
+  // Students are scoped by department; staff accounts are not in a department at
+  // all, so a departmental reviewer still finds the faculty they work with.
+  const conditions = [sql`${users.accountType} <> 'COLLEGE_STUDENT'`];
+  if (scope.departmentIds.length) {
+    conditions.push(
+      sql`exists (
+        select 1 from ${studentProfiles}
+        where ${studentProfiles.userId} = ${users.id}
+          and ${inArray(studentProfiles.departmentId, scope.departmentIds)}
+      )`,
+    );
+  }
+  return db
+    .select({
+      id: users.id,
+      fullName: users.fullName,
+      email: users.email,
+      accountType: users.accountType,
+      status: users.status,
+    })
+    .from(users)
+    .where(and(byName, or(...conditions)))
+    .orderBy(users.fullName)
+    .limit(limit);
+}
+
+/**
  * One search box for the console. Events follow the same management scope as
  * the Events page: Admin sees everything, an HOD/Dean sees their departments,
- * and club members see their clubs — drafts included. People are only exposed
- * to administrators, with the console role that explains who they are.
+ * and club members see their clubs — drafts included.
  */
 export const searchRoutes = new Hono();
 searchRoutes.use("*", authenticate, requireActiveAccount);
@@ -68,20 +157,7 @@ searchRoutes.get("/", async (c) => {
           .limit(limit)
       : [];
 
-  const peopleRows = hasRole(auth, "ADMIN")
-    ? await db
-        .select({
-          id: users.id,
-          fullName: users.fullName,
-          email: users.email,
-          accountType: users.accountType,
-          status: users.status,
-        })
-        .from(users)
-        .where(or(ilike(users.fullName, needle), ilike(users.email, needle)))
-        .orderBy(users.fullName)
-        .limit(limit)
-    : [];
+  const peopleRows = await searchablePeople(auth, needle, limit);
   const peopleIds = peopleRows.map((p) => p.id);
   const [staffRoles, clubRoles] = peopleIds.length
     ? await Promise.all([

@@ -3,6 +3,7 @@ import {
   type EligibilityReason,
   eligibilityPolicySchema,
   evaluateEligibility,
+  policyForSubject,
 } from "@campusops/shared";
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { getDb } from "../../db/client";
@@ -92,7 +93,12 @@ export async function register(auth: AuthContext, eventId: string, audit?: Audit
         .from(studentProfiles)
         .where(eq(studentProfiles.userId, auth.user.id))
         .limit(1);
-      const policy = eligibilityPolicySchema.parse(event.eligibilityPolicy);
+      // An outsider is judged on the rules that can apply to an outsider. A
+      // campus-only department or batch rule is not something they can satisfy.
+      const policy = policyForSubject(
+        eligibilityPolicySchema.parse(event.eligibilityPolicy),
+        auth.user.accountType,
+      );
       const eligibility = evaluateEligibility(policy, {
         accountType: auth.user.accountType,
         departmentId: student?.departmentId ?? null,
@@ -111,9 +117,17 @@ export async function register(auth: AuthContext, eventId: string, audit?: Audit
       const quizAdmission =
         event.admissionMode === "QUIZ_TOP_N" || event.admissionMode === "QUIZ_FIRST_QUALIFIED";
 
+      // An outsider applies; they do not take a seat. Every registration from
+      // outside the college starts as an application the organiser accepts or
+      // declines, whatever the event's admission mode is — "outsiders allowed"
+      // means "outsiders may ask", not "outsiders are in".
+      const outsiderApplication = auth.user.accountType === "OUTSIDER_STUDENT";
+
       let status: "CONFIRMED" | "WAITLISTED" | "APPLIED" = "APPLIED";
       let queuePosition: number | null = null;
-      if (event.admissionMode === "FCFS") {
+      if (outsiderApplication) {
+        status = "APPLIED";
+      } else if (event.admissionMode === "FCFS") {
         const [taken] = await tx
           .select({ n: count() })
           .from(registrations)
@@ -179,9 +193,11 @@ export async function register(auth: AuthContext, eventId: string, audit?: Audit
         actorId: auth.user.id,
         reason: reclaiming
           ? "Registered again after giving up a place."
-          : quizAdmission
-            ? "Registered; seat depends on the quiz result."
-            : "Registered from the mobile app.",
+          : outsiderApplication
+            ? "Applied as a visitor; the organisers decide whether to accept."
+            : quizAdmission
+              ? "Registered; seat depends on the quiz result."
+              : "Registered from the mobile app.",
       });
       let passId: string | null = null;
       if (status === "CONFIRMED") {

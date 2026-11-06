@@ -18,7 +18,10 @@ const pageSchema = shared.offsetPaginationSchema;
 export const facultyRoutes = new Hono();
 facultyRoutes.use("*", authenticate);
 
-facultyRoutes.get("/verification-queue", requireRole("FACULTY", "HOD_DEAN"), async (c) =>
+// Verification is a FACULTY action (see the verify/reject routes below).
+// HOD/DEAN used to see this queue too and could act on nothing in it; they read
+// the same students on the Students page, which also shows unverified accounts.
+facultyRoutes.get("/verification-queue", requireRole("FACULTY"), async (c) =>
   ok(c, await service.listVerificationQueue(c.get("auth"), parseQuery(c, pageSchema))),
 );
 facultyRoutes.get("/students", requireRole("HOD_DEAN", "ADMIN"), async (c) =>

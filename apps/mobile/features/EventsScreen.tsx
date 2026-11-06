@@ -431,6 +431,7 @@ export function EventsScreen({
         <Loading />
       ) : (tab === "discover" ? visible.length === 0 : registrations.length === 0) ? (
         <Empty
+          doodle="calendar"
           title={tab === "mine" ? "No registrations yet" : "No events found"}
           detail={
             tab === "mine"

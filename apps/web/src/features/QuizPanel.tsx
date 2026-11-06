@@ -10,11 +10,11 @@ import { ConfirmDialog, Loading, useAction, useToast } from "../components/feedb
 import {
   Card,
   Empty,
-  ErrorNote,
   Field,
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { api, errorMessage } from "../lib/api";
 import type { EventRow } from "../lib/types";
@@ -87,6 +87,8 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
   const action = useAction();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [quiz, setQuiz] = useState<QuizRow | null>(null);
   const [canSeeKey, setCanSeeKey] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -252,8 +254,6 @@ export function QuizPanel({ event, canManage }: { event: EventRow; canManage: bo
 
   return (
     <div className="stack">
-      <ErrorNote message={error} />
-
       <Card title="How seats are decided">
         <p className="meta">
           <strong>{QUIZ_MODE_LABELS[mode]}</strong> · {event.capacity} event seats

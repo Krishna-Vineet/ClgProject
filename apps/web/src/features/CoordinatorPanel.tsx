@@ -14,14 +14,13 @@ import { Icon } from "../components/icons";
 import {
   Card,
   Empty,
-  ErrorNote,
   EventBadge,
   Field,
   SkeletonRows,
-  SuccessNote,
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, downloadBlob, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
@@ -128,6 +127,9 @@ export function CoordinatorPanel({
   );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Every panel message is a toast: it appears where the eye is, including
+  // over an open dialog, instead of in a bar at the top of the card.
+  useNotice(error, notice);
   const [busy, setBusy] = useState(false);
   const [eventOffset, setEventOffset] = useState(0);
   const [eventsMore, setEventsMore] = useState(false);
@@ -590,9 +592,6 @@ export function CoordinatorPanel({
 
   return (
     <>
-      <ErrorNote message={error} />
-      <SuccessNote message={notice} />
-
       <div className={selected ? "events-shell is-focused" : "events-shell"}>
         {!selected && (
           <header className="events-head">

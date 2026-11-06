@@ -88,6 +88,7 @@ export function InboxScreen({ onOpenEvent }: { onOpenEvent?: (eventId: string) =
 
       {items.length === 0 ? (
         <Empty
+          doodle="megaphone"
           title="Nothing yet"
           detail="When a coordinator posts an update for one of your events, it appears here."
         />

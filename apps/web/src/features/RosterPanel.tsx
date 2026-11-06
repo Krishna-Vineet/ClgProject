@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmDialog, Loading, Pager, useAction, useToast } from "../components/feedback";
-import { Card, Empty, ErrorNote, Field, formatWhen } from "../components/ui";
+import { Card, Empty, Field, formatWhen, useNotice } from "../components/ui";
 import { type Page, api, downloadBlob, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
 import type { EventRow } from "../lib/types";
@@ -58,6 +58,8 @@ export function RosterPanel({ event, canManage }: { event: EventRow; canManage: 
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [totals, setTotals] = useState<(Totals & { capacity: number }) | null>(null);
@@ -100,8 +102,6 @@ export function RosterPanel({ event, canManage }: { event: EventRow; canManage: 
 
   return (
     <div className="stack">
-      <ErrorNote message={error} />
-
       {totals && (
         <div className="stat-grid">
           {(

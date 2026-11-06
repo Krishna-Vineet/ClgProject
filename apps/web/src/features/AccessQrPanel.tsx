@@ -22,11 +22,11 @@ import {
 } from "../components/feedback";
 import {
   Empty,
-  ErrorNote,
   Field,
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
@@ -181,6 +181,8 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
   const [offset, setOffset] = useState(0);
   const [filter, setFilter] = useState({ checkpointId: "", result: "" });
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [form, setForm] = useState<Form>(() => blankForm(event));
   const [editing, setEditing] = useState<Checkpoint | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -267,7 +269,6 @@ export function AccessQrPanel({ event, canManage }: { event: EventRow; canManage
   const typeLocked = Boolean(editing && editing.uses > 0);
   return (
     <>
-      <ErrorNote message={error} />
       <div className="subtabs">
         {(
           [

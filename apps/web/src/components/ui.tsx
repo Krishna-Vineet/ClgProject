@@ -4,8 +4,69 @@ import {
   type EventStatus,
   type ReservationStatus,
 } from "@campusops/shared/ui";
-import { type ReactElement, type ReactNode, cloneElement, isValidElement, useId } from "react";
+import {
+  type ReactElement,
+  type ReactNode,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
+import { useToast } from "./feedback";
 import { Icon } from "./icons";
+import { Sketch, type SketchName } from "./sketch";
+
+/** Empty-state illustrations, keyed by the icon the caller already passes. */
+const SKETCH_FOR_ICON: Record<string, SketchName> = {
+  compass: "campus",
+  calendar: "calendar",
+  check: "checklist",
+  ticket: "ticket",
+  room: "room",
+  megaphone: "megaphone",
+  clipboard: "clipboard",
+  chart: "chart",
+  search: "search",
+  inbox: "inbox",
+  key: "key",
+  flag: "spark",
+};
+
+/**
+ * Announce a message instead of drawing it inline.
+ *
+ * Panels used to set `error`/`notice` state and render an `ErrorNote` /
+ * `SuccessNote` bar at the top of their card. That put the answer in a different
+ * place from the button that caused it — often scrolled out of view — and made
+ * every panel invent its own placement. This hook keeps the same call shape at
+ * the call site but sends the message to the toast layer, which lives in the top
+ * layer and is therefore visible over a modal too.
+ *
+ * The `<ErrorNote>` / `<SuccessNote>` components below still exist for genuinely
+ * persistent conditions (a failed integrity check, a form validation summary) —
+ * those must stay on screen. Anything that is a *response to an action* is a
+ * toast.
+ *
+ * A null message is ignored, and repeating the same text within a moment is
+ * collapsed, because several panels re-derive the same error on every render.
+ */
+export function useNotice(error: string | null, notice: string | null) {
+  const toast = useToast();
+  const seen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!error) return;
+    if (seen.current === `e:${error}`) return;
+    seen.current = `e:${error}`;
+    toast.err(error);
+  }, [error, toast]);
+  useEffect(() => {
+    if (!notice) return;
+    if (seen.current === `n:${notice}`) return;
+    seen.current = `n:${notice}`;
+    toast.ok(notice);
+  }, [notice, toast]);
+}
 
 /**
  * A surface with a title. `subtitle` is for one line of context; anything longer
@@ -147,8 +208,10 @@ export function Empty({
 }) {
   return (
     <div className="empty">
+      {/* A drawn figure in every empty state, chosen by the caller's icon so the
+          illustration matches the subject ("no rooms yet" draws a room). */}
       <span className="empty-mark" aria-hidden="true">
-        <Icon name={icon} size={20} />
+        <Sketch name={SKETCH_FOR_ICON[icon] ?? "spark"} width={72} height={72} />
       </span>
       <div className="empty-copy">
         {title ? <strong>{title}</strong> : null}

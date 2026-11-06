@@ -2,6 +2,7 @@ import { QR_DIRECTION_LABELS, QR_TYPE_LABELS } from "@campusops/shared/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { QrCode } from "../components/QrCode";
+import { Sketch } from "../components/Sketch";
 import {
   Badge,
   Button,
@@ -12,6 +13,7 @@ import {
   Muted,
   Note,
   Screen,
+  ScreenOverlay,
   Title,
   colors,
   fonts,
@@ -124,247 +126,267 @@ export function PassesScreen() {
       </Screen>
     );
   return (
-    <Screen>
-      <Title
-        eyebrow={
-          passes.length
-            ? `${passes.length} active wallet${passes.length === 1 ? "" : "s"}`
-            : "Your wallet"
-        }
-        title="Event passes"
-        subtitle="Show one code at one gate. It rotates on its own, so a screenshot is useless."
-      />
-      <Note message={error} />
-      {passes.length === 0 ? (
-        <Empty
-          title="No passes yet"
-          detail="A pass appears after your registration is confirmed. Waitlisted and applied registrations do not receive a pass."
+    <>
+      {/* Outside <Screen>, so the dim covers the whole body rather than only the
+          scrolling content — a loader that stops at the header reads as a bug. */}
+      <ScreenOverlay visible={codeBusy && !nonce} label="Preparing a secure code" />
+      <Screen>
+        <Title
+          eyebrow={
+            passes.length
+              ? `${passes.length} active wallet${passes.length === 1 ? "" : "s"}`
+              : "Your wallet"
+          }
+          title="Event passes"
+          subtitle="Show one code at one gate. It rotates on its own, so a screenshot is useless."
         />
-      ) : (
-        <>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            {passes.map((p) => (
-              <Chip
-                key={p.passId}
-                label={p.event?.title ?? "Event pass"}
-                selected={p.passId === pass?.passId}
-                onPress={() => {
-                  setPassId(p.passId);
-                  setQrId(null);
-                }}
-              />
-            ))}
-          </ScrollView>
-          {pass && (
-            <>
-              <Card tone="ink">
-                <View style={{ gap: 5 }}>
-                  <Text
-                    style={{
-                      fontFamily: fonts.mono,
-                      fontSize: 8.5,
-                      letterSpacing: 1.5,
-                      textTransform: "uppercase",
-                      color: "rgba(246,241,229,0.5)",
-                    }}
-                  >
-                    {pass.event.status === "LIVE" ? "Live now" : "Your pass"}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: fonts.display,
-                      fontSize: 24,
-                      fontWeight: "500",
-                      letterSpacing: -0.4,
-                      color: colors.cream,
-                      lineHeight: 28,
-                    }}
-                  >
-                    {pass.event?.title ?? "Event pass"}
-                  </Text>
-                  <Text style={{ color: "rgba(246,241,229,0.62)", fontSize: 12.5, lineHeight: 18 }}>
-                    {when(pass.event.startsAt, tz)}
-                    {" · "}
-                    {pass.event.venueSummary ?? "Venue to be announced"}
-                  </Text>
-                </View>
-                {pass.revokedAt && (
-                  <Note message="This pass has been revoked. Contact the event coordinator." />
-                )}
-              </Card>
-              {pass.checkpoints.length === 0 ? (
-                <Empty
-                  title="No QRs defined yet"
-                  detail="The coordinator has not added access QRs to this event."
+        <Note message={error} />
+        {passes.length === 0 ? (
+          <Empty
+            doodle="pass"
+            title="No passes yet"
+            detail="A pass appears after your registration is confirmed. Waitlisted and applied registrations do not receive a pass."
+          />
+        ) : (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {passes.map((p) => (
+                <Chip
+                  key={p.passId}
+                  label={p.event?.title ?? "Event pass"}
+                  selected={p.passId === pass?.passId}
+                  onPress={() => {
+                    setPassId(p.passId);
+                    setQrId(null);
+                  }}
                 />
-              ) : (
-                <>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                    accessibilityLabel="Event QR names"
+              ))}
+            </ScrollView>
+            {pass && (
+              <>
+                <Card tone="ink">
+                  {/* A doodle watermark on the dark card: the one place the ink
+                      drawing appears in reverse, which is what makes the pass feel
+                      printed rather than laid out. */}
+                  <View
+                    pointerEvents="none"
+                    style={{ position: "absolute", right: -14, bottom: -18 }}
                   >
-                    {pass.checkpoints.map((c) => (
-                      <Chip
-                        key={c.qrId}
-                        label={c.name}
-                        selected={c.qrId === qr?.qrId}
-                        onPress={() => setQrId(c.qrId)}
-                      />
-                    ))}
-                  </ScrollView>
-                  {qr && (
-                    <Card>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <Text
+                    <Sketch name="stamp" size={132} color={colors.cream} faint />
+                  </View>
+                  <View style={{ gap: 5 }}>
+                    <Text
+                      style={{
+                        fontFamily: fonts.mono,
+                        fontSize: 8.5,
+                        letterSpacing: 1.5,
+                        textTransform: "uppercase",
+                        color: "rgba(246,241,229,0.5)",
+                      }}
+                    >
+                      {pass.event.status === "LIVE" ? "Live now" : "Your pass"}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fonts.display,
+                        fontSize: 24,
+                        fontWeight: "500",
+                        letterSpacing: -0.4,
+                        color: colors.cream,
+                        lineHeight: 28,
+                      }}
+                    >
+                      {pass.event?.title ?? "Event pass"}
+                    </Text>
+                    <Text
+                      style={{ color: "rgba(246,241,229,0.62)", fontSize: 12.5, lineHeight: 18 }}
+                    >
+                      {when(pass.event.startsAt, tz)}
+                      {" · "}
+                      {pass.event.venueSummary ?? "Venue to be announced"}
+                    </Text>
+                  </View>
+                  {pass.revokedAt && (
+                    <Note message="This pass has been revoked. Contact the event coordinator." />
+                  )}
+                </Card>
+                {pass.checkpoints.length === 0 ? (
+                  <Empty
+                    doodle="pass"
+                    title="No QRs defined yet"
+                    detail="The coordinator has not added access QRs to this event."
+                  />
+                ) : (
+                  <>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8 }}
+                      accessibilityLabel="Event QR names"
+                    >
+                      {pass.checkpoints.map((c) => (
+                        <Chip
+                          key={c.qrId}
+                          label={c.name}
+                          selected={c.qrId === qr?.qrId}
+                          onPress={() => setQrId(c.qrId)}
+                        />
+                      ))}
+                    </ScrollView>
+                    {qr && (
+                      <Card>
+                        <View
                           style={{
-                            fontFamily: fonts.display,
-                            fontSize: 25,
-                            fontWeight: "500",
-                            letterSpacing: -0.4,
-                            color: colors.ink,
-                            flex: 1,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {qr.name}
-                        </Text>
-                        <Badge
-                          label={qr.availableNow ? "Ready" : "Unavailable"}
-                          tone={qr.availableNow ? "good" : "warn"}
-                        />
-                      </View>
-                      <Muted>
-                        {QR_TYPE_LABELS[qr.qrType]} · {qr.summary.split(" · ")[1]}
-                      </Muted>
-                      {qr.nextDirection && (
-                        <Badge
-                          label={`Next scan: ${QR_DIRECTION_LABELS[qr.nextDirection]}`}
-                          tone="primary"
-                        />
-                      )}
-                      <View style={{ alignItems: "center", gap: 10, paddingVertical: 10 }}>
-                        {qr.availableNow && nonce && !expired ? (
-                          <>
-                            <View
-                              style={{
-                                padding: 10,
-                                backgroundColor: "#ffffff",
-                                borderRadius: 14,
-                                borderWidth: 1,
-                                borderColor: colors.line,
-                              }}
-                            >
-                              <QrCode value={nonce.token} />
-                            </View>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                              <View
-                                style={{
-                                  width: 5,
-                                  height: 5,
-                                  borderRadius: 3,
-                                  backgroundColor: colors.good,
-                                }}
-                              />
-                              <Text
-                                style={{ fontSize: 11.5, color: colors.muted }}
-                                accessibilityLiveRegion="polite"
-                              >
-                                {seconds}s left on this code · valid for this QR only
-                              </Text>
-                            </View>
-                          </>
-                        ) : qr.availableNow && expired ? (
-                          // Expired, not gone: keep the card in place, say exactly
-                          // what happened, and make the fix a single explicit tap.
-                          // The 60s lifetime is the point — a code that never
-                          // expires can be screenshotted and shared.
-                          <View style={{ alignItems: "center", gap: 10, paddingVertical: 16 }}>
-                            <Badge label="Code expired" tone="warn" />
-                            <Text
-                              style={{
-                                fontSize: 12.5,
-                                color: colors.muted,
-                                textAlign: "center",
-                                lineHeight: 18,
-                                maxWidth: 260,
-                              }}
-                            >
-                              This code was valid for about a minute after it appeared. Refresh to
-                              get a new one — the gate needs a live code.
-                            </Text>
-                            <Button
-                              label={codeBusy ? "Refreshing…" : "Refresh"}
-                              onPress={() => {
-                                void mint();
-                              }}
-                              disabled={codeBusy}
-                              testID="pass-refresh-code"
-                            />
-                          </View>
-                        ) : codeBusy ? (
-                          <Loading label="Preparing secure code…" />
-                        ) : (
-                          <Note
-                            tone="warn"
-                            message={codeError ?? qr.unavailableReason ?? "Preparing code…"}
+                          <Text
+                            style={{
+                              fontFamily: fonts.display,
+                              fontSize: 25,
+                              fontWeight: "500",
+                              letterSpacing: -0.4,
+                              color: colors.ink,
+                              flex: 1,
+                            }}
+                          >
+                            {qr.name}
+                          </Text>
+                          <Badge
+                            label={qr.availableNow ? "Ready" : "Unavailable"}
+                            tone={qr.availableNow ? "good" : "warn"}
+                          />
+                        </View>
+                        <Muted>
+                          {QR_TYPE_LABELS[qr.qrType]} · {qr.summary.split(" · ")[1]}
+                        </Muted>
+                        {qr.nextDirection && (
+                          <Badge
+                            label={`Next scan: ${QR_DIRECTION_LABELS[qr.nextDirection]}`}
+                            tone="primary"
                           />
                         )}
-                      </View>
-                      <Note message={codeError} />
-                      <View style={{ flexDirection: "row", gap: 16, flexWrap: "wrap" }}>
-                        <Muted>Used: {qr.usedCount}</Muted>
-                        <Muted>
-                          {qr.remaining === null ? "No use limit" : `${qr.remaining} left`}
-                        </Muted>
-                        {qr.requiresIdCheck && <Muted>College ID check required</Muted>}
-                      </View>
-                      {qr.validityMode === "WINDOW" && qr.validFrom && qr.validUntil && (
-                        <Muted>
-                          Valid {when(qr.validFrom, tz)} → {when(qr.validUntil, tz)}
-                        </Muted>
-                      )}
-                      {qr.validityMode === "DATE" && (
-                        <Muted>
-                          Valid on {qr.validOn} ({tz})
-                        </Muted>
-                      )}
-                      {qr.validityMode === "MANUAL" && (
-                        <Muted>The coordinator switches this QR on when it is being served.</Muted>
-                      )}
-                      <Button
-                        label="Refresh code & status"
-                        variant="ghost"
-                        disabled={codeBusy}
-                        onPress={() => {
-                          // Status first (the QR may have been switched off while the
-                          // code was expiring), then the code itself.
-                          void load().then(() => mint());
-                        }}
-                      />
-                    </Card>
-                  )}
-                </>
-              )}
-              <Note
-                tone="neutral"
-                message="Only you may use this pass. The organiser checks your college ID where required; a screenshot or a friend cannot attend on your behalf."
-              />
-            </>
-          )}
-        </>
-      )}
-    </Screen>
+                        <View style={{ alignItems: "center", gap: 10, paddingVertical: 10 }}>
+                          {qr.availableNow && nonce && !expired ? (
+                            <>
+                              <View
+                                style={{
+                                  padding: 10,
+                                  backgroundColor: "#ffffff",
+                                  borderRadius: 14,
+                                  borderWidth: 1,
+                                  borderColor: colors.line,
+                                }}
+                              >
+                                <QrCode value={nonce.token} />
+                              </View>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <View
+                                  style={{
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: 3,
+                                    backgroundColor: colors.good,
+                                  }}
+                                />
+                                <Text
+                                  style={{ fontSize: 11.5, color: colors.muted }}
+                                  accessibilityLiveRegion="polite"
+                                >
+                                  {seconds}s left on this code · valid for this QR only
+                                </Text>
+                              </View>
+                            </>
+                          ) : qr.availableNow && expired ? (
+                            // Expired, not gone: keep the card in place, say exactly
+                            // what happened, and make the fix a single explicit tap.
+                            // The 60s lifetime is the point — a code that never
+                            // expires can be screenshotted and shared.
+                            <View style={{ alignItems: "center", gap: 10, paddingVertical: 16 }}>
+                              <Badge label="Code expired" tone="warn" />
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  color: colors.muted,
+                                  textAlign: "center",
+                                  lineHeight: 18,
+                                  maxWidth: 260,
+                                }}
+                              >
+                                This code was valid for about a minute after it appeared. Refresh to
+                                get a new one — the gate needs a live code.
+                              </Text>
+                              <Button
+                                label={codeBusy ? "Refreshing…" : "Refresh"}
+                                onPress={() => {
+                                  void mint();
+                                }}
+                                disabled={codeBusy}
+                                testID="pass-refresh-code"
+                              />
+                            </View>
+                          ) : codeBusy ? (
+                            <Loading label="Preparing secure code…" />
+                          ) : (
+                            <Note
+                              tone="warn"
+                              message={codeError ?? qr.unavailableReason ?? "Preparing code…"}
+                            />
+                          )}
+                        </View>
+                        <Note message={codeError} />
+                        <View style={{ flexDirection: "row", gap: 16, flexWrap: "wrap" }}>
+                          <Muted>Used: {qr.usedCount}</Muted>
+                          <Muted>
+                            {qr.remaining === null ? "No use limit" : `${qr.remaining} left`}
+                          </Muted>
+                          {qr.requiresIdCheck && <Muted>College ID check required</Muted>}
+                        </View>
+                        {qr.validityMode === "WINDOW" && qr.validFrom && qr.validUntil && (
+                          <Muted>
+                            Valid {when(qr.validFrom, tz)} → {when(qr.validUntil, tz)}
+                          </Muted>
+                        )}
+                        {qr.validityMode === "DATE" && (
+                          <Muted>
+                            Valid on {qr.validOn} ({tz})
+                          </Muted>
+                        )}
+                        {qr.validityMode === "MANUAL" && (
+                          <Muted>
+                            The coordinator switches this QR on when it is being served.
+                          </Muted>
+                        )}
+                        <Button
+                          label="Refresh code & status"
+                          variant="ghost"
+                          disabled={codeBusy}
+                          onPress={() => {
+                            // Status first (the QR may have been switched off while the
+                            // code was expiring), then the code itself.
+                            void load().then(() => mint());
+                          }}
+                        />
+                      </Card>
+                    )}
+                  </>
+                )}
+                <Note
+                  tone="neutral"
+                  message="Only you may use this pass. The organiser checks your college ID where required; a screenshot or a friend cannot attend on your behalf."
+                />
+              </>
+            )}
+          </>
+        )}
+      </Screen>
+    </>
   );
 }

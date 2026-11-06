@@ -5,11 +5,10 @@ import {
   ApprovalBadge,
   Card,
   Empty,
-  ErrorNote,
   Field,
   ReservationBadge,
-  SuccessNote,
   formatWhen,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, errorMessage, query } from "../lib/api";
 import type { ApprovalRequestRow, Approver, InboxItem, RequestDetail } from "../lib/types";
@@ -25,6 +24,9 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
   // backdrop, so it cannot carry the message; the toast layer can.
   const toast = useToast();
   const [notice, setNotice] = useState<string | null>(null);
+  // Every panel message is a toast: it appears where the eye is, including
+  // over an open dialog, instead of in a bar at the top of the card.
+  useNotice(error, notice);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     // No scope switch: the inbox is already exactly what this person may decide
@@ -109,8 +111,6 @@ export function ApprovalsPanel({ onChanged }: { onChanged?: () => void } = {}) {
 
   return (
     <>
-      <ErrorNote message={error} />
-      <SuccessNote message={notice} />
       <Card
         title="Approval inbox"
         actions={

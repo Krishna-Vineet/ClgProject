@@ -12,10 +12,13 @@ import {
 } from "react";
 import { ToastProvider } from "./components/feedback";
 import { Icon, Logo } from "./components/icons";
+import { FullPageLoader, RouteProgress } from "./components/loaders";
+import { SketchBackdrop, SketchUnderline } from "./components/sketch";
 import { Card, Kbd, PanelSkeleton, formatDay } from "./components/ui";
 import { AuthPanel } from "./features/AuthPanel";
 import { type DashboardData, DashboardPanel } from "./features/DashboardPanel";
 import { type Page, api, query } from "./lib/api";
+import { beginRoute, endRouteSoon } from "./lib/router";
 import { SessionProvider, useSession } from "./lib/session";
 import type { EventRow } from "./lib/types";
 
@@ -364,8 +367,14 @@ function Shell() {
       return;
     }
     if (isTab(next)) {
+      // Mark the transition before the state change so the progress bar can
+      // appear in the same paint as the click, and clear it once the new tab has
+      // actually been painted. Without this the gap between click and chunk
+      // arrival looks like a dropped click.
+      beginRoute();
       setTab(next);
       location.hash = `/${next}`;
+      endRouteSoon();
     }
   }, []);
   const openEvent = useCallback(
@@ -420,17 +429,9 @@ function Shell() {
   }, [pageTitle, attention]);
 
   if (loading)
-    return (
-      <div className="boot-screen" aria-busy="true" aria-live="polite">
-        <span className="boot-mark" aria-hidden="true">
-          <Icon name="ticket" size={21} />
-        </span>
-        <div className="boot-copy">
-          <b>CampusOps</b>
-          <span>Restoring your session</span>
-        </div>
-      </div>
-    );
+    // A real loader, not a static word: the sketched arc draws itself in and the
+    // spinner carries the motion, so a slow cold start reads as progress.
+    return <FullPageLoader label="Restoring your session" />;
 
   if (!me)
     return (
@@ -1074,6 +1075,8 @@ function Shell() {
           </div>
         </header>
 
+        <RouteProgress />
+        <SketchBackdrop />
         <main id="main-content" className="content">
           {!online && (
             <output className="offline-bar">
@@ -1099,7 +1102,10 @@ function Shell() {
               <div className="page-head">
                 <div>
                   <p className="eyebrow">{TAB_META[active].group}</p>
-                  <h1>{tabLabel(active)}</h1>
+                  <h1>
+                    {tabLabel(active)}
+                    <SketchUnderline />
+                  </h1>
                   <p className="lead">{SECTION_LEDE[active]}</p>
                 </div>
               </div>

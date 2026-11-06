@@ -269,7 +269,14 @@ describe("global search event scope", () => {
   });
 
   test("published events outside the club stay discoverable", async () => {
-    const res = await request("GET", "/search?q=Showcase", tokens.lead);
+    // Search the run prefix, not the bare word: the test database is shared
+    // between runs, and five older "... Public Showcase" rows would fill the
+    // default result limit and push this run's event out of the page.
+    const res = await request(
+      "GET",
+      `/search?q=${encodeURIComponent(`${prefix} Public Showcase`)}`,
+      tokens.lead,
+    );
     expect(res.status).toBe(200);
     expect(res.json.data.events.map((e: Body) => e.id)).toContain(ids.publicEvent);
   });

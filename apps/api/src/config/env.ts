@@ -70,7 +70,15 @@ const envSchema = z
 
     JWT_ACCESS_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
     REFRESH_TOKEN_PEPPER: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
-    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    // How long an access token is accepted. The old default was 15 minutes, short
+    // enough that an organiser halfway through filling an event form could have a
+    // request fail mid-save; the refresh path is transparent, but every expiry is
+    // still a race with a write. An hour is the common default for a first-party
+    // web client with an httpOnly refresh token behind it, and the refresh token
+    // (30 days, rotated, reuse-detected) is what actually bounds a session.
+    // Raise it further with this variable; the cap is a day so a leaked token
+    // still dies.
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(3600),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(600),
     OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),

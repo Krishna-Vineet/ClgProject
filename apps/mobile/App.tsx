@@ -1,10 +1,10 @@
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { AppIcon, type AppIconName, Logo } from "./components/icons";
-import { Button, Note, Screen, Title, colors, fonts } from "./components/ui";
+import { Button, Note, Screen, Title, colors, elevation, fonts } from "./components/ui";
 import { AuthScreen } from "./features/AuthScreen";
 import { ComplaintsScreen } from "./features/ComplaintsScreen";
 import { EventsScreen } from "./features/EventsScreen";
@@ -14,6 +14,7 @@ import { PendingScreen, ProfileScreen } from "./features/ProfileScreen";
 import { QuizScreen } from "./features/QuizScreen";
 import { ScannerScreen } from "./features/ScannerScreen";
 import { complaintLocationId } from "./lib/format";
+import { nativeDriverProp } from "./lib/motion";
 import { SessionProvider, useSession } from "./lib/session";
 
 type Tab = "events" | "inbox" | "passes" | "scan" | "issues" | "profile";
@@ -28,21 +29,25 @@ const tabs: Array<{ id: Tab; label: string; icon: AppIconName }> = [
 
 function useScreenIn(tab: Tab) {
   const value = useRef(new Animated.Value(1)).current;
-  // The tab id is the trigger: each switch replays the entrance.
+  // The tab id is the trigger: each switch replays the entrance. The driver is
+  // chosen by lib/motion, which is the only place that decides whether the
+  // native animation module can be used — otherwise every one of these calls
+  // prints React Native's three-paragraph fallback warning in Expo.
   // biome-ignore lint/correctness/useExhaustiveDependencies: tab is the trigger
   useEffect(() => {
     value.setValue(0);
     Animated.timing(value, {
       toValue: 1,
-      duration: 260,
-      useNativeDriver: true,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      ...nativeDriverProp(),
     }).start();
   }, [tab, value]);
   return {
     opacity: value,
     transform: [
       {
-        translateY: value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
+        translateY: value.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
       },
     ],
   };
@@ -188,8 +193,9 @@ function Shell() {
                   setEventTarget(null);
                 }
               }}
-              style={({ pressed }) => [s.tab, pressed && { opacity: 0.7 }]}
+              style={s.tab}
             >
+              {active && !isScan ? <View style={s.tabPill} /> : null}
               <View style={isScan ? [s.scanOrb, active && s.scanOrbActive] : s.iconWrap}>
                 <AppIcon
                   name={item.icon}
@@ -201,7 +207,6 @@ function Shell() {
               <Text style={[s.label, active && s.activeLabel]} numberOfLines={1}>
                 {item.label}
               </Text>
-              {active && !isScan && <View style={s.activeMark} />}
             </Pressable>
           );
         })}
@@ -226,6 +231,9 @@ export default function App() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   shell: { flex: 1, width: "100%", maxWidth: 760, alignSelf: "center" },
+  /* No rule under the header: the brand floats on the paper with the ambient
+     doodles behind it, which is what makes the top of the app feel like a sheet
+     rather than a toolbar. */
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -233,8 +241,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 8,
     paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
     backgroundColor: colors.bg,
   },
   brand: { flexDirection: "row", alignItems: "center", gap: 9 },
@@ -275,17 +281,23 @@ const s = StyleSheet.create({
     color: colors.primaryInk,
   },
   body: { flex: 1 },
+  /* A floating bar, not a strip glued to the bottom edge: detached, fully
+     rounded, with a soft lift. This is the one place the app most looks like a
+     website if it gets it wrong. */
   nav: {
     flexDirection: "row",
     backgroundColor: colors.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    paddingHorizontal: 6,
-    paddingTop: 8,
-    paddingBottom: 8,
+    borderRadius: 26,
+    paddingHorizontal: 8,
+    paddingTop: 9,
+    paddingBottom: 9,
     gap: 2,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    ...elevation.floating,
   },
   tab: {
+    position: "relative",
     flex: 1,
     alignItems: "center",
     paddingVertical: 2,
@@ -293,15 +305,25 @@ const s = StyleSheet.create({
     minHeight: 50,
     justifyContent: "flex-end",
   },
+  /* The selection is a soft capsule behind the icon, the way a segmented
+     control reads, instead of a dot that appears and disappears. */
+  tabPill: {
+    position: "absolute",
+    top: -2,
+    width: 46,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: colors.soft,
+  },
   iconWrap: { height: 24, alignItems: "center", justifyContent: "center" },
   scanOrb: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
     backgroundColor: colors.dark,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -16,
+    marginTop: -20,
     borderWidth: 3,
     borderColor: colors.card,
   },
@@ -314,10 +336,4 @@ const s = StyleSheet.create({
     fontFamily: fonts.sans,
   },
   activeLabel: { color: colors.ink },
-  activeMark: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-  },
 });

@@ -267,6 +267,7 @@ export function ScannerScreen({ onComplaint }: { onComplaint: (id: string) => vo
           </Muted>
           {events.length === 0 ? (
             <Empty
+              doodle="key"
               title="No live event to scan"
               detail="Access QRs only work while an event is live. Ask its coordinator to start it from the web console, or check that you are on the event's club team."
             />
@@ -461,6 +462,7 @@ export function ScannerScreen({ onComplaint }: { onComplaint: (id: string) => vo
               </View>
             ) : (
               <Empty
+                doodle="key"
                 title="Camera access is off"
                 detail="Allow camera access to scan a poster or pass. You can also paste a code below."
               />

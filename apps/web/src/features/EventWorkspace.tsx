@@ -25,6 +25,7 @@ import {
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
@@ -203,6 +204,12 @@ export function EventWorkspace({
   const [yearsText, setYearsText] = useState("");
   const [departments, setDepartments] = useState<Department[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Every action result is a toast. `historyError` and `inviteError` are also
+  // action results, so they go the same way; nothing loses its message just
+  // because it used to be rendered next to the control that caused it.
+  // `error` can also be a standing condition ("could not load this draft"), which
+  // is why it is not suppressed here — the panel keeps its skeleton on screen.
+  useNotice(error, null);
 
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [inviteText, setInviteText] = useState("");
@@ -215,6 +222,8 @@ export function EventWorkspace({
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditMore, setAuditMore] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  useNotice(inviteError, null);
+  useNotice(historyError, null);
 
   const [confirm, setConfirm] = useState<null | "start" | "complete" | "delete">(null);
 
@@ -469,8 +478,6 @@ export function EventWorkspace({
         </nav>
 
         <div className="event-content">
-          <ErrorNote message={error} />
-
           {tab === "overview" &&
             (overview ? (
               overview(selectTab)
@@ -848,7 +855,6 @@ export function EventWorkspace({
                       onChange={(e) => setInviteExpiry(e.target.value)}
                     />
                   </Field>
-                  {inviteError && <ErrorNote message={inviteError} />}
                   <button type="submit" disabled={action.busy}>
                     Invite
                   </button>
@@ -901,7 +907,6 @@ export function EventWorkspace({
 
           {tab === "history" && (
             <>
-              {historyError && <ErrorNote message={historyError} />}
               <h3>Revisions</h3>
               {revisions.length === 0 ? (
                 <Empty>No revisions recorded.</Empty>

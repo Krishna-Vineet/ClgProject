@@ -52,8 +52,18 @@ export async function generateReportHandler(c: Context) {
 
 export async function previewReportHandler(c: Context) {
   const { notes } = parseQuery(c, schemas.reportPreviewQuerySchema);
-  const snapshot = await service.buildSnapshot(c.get("auth"), c.req.param("id") as string, notes);
-  return ok(c, { snapshot, checksum: service.checksumOf(snapshot), preview: true });
+  const base = await service.buildSnapshot(c.get("auth"), c.req.param("id") as string, notes);
+  const checksum = service.checksumOf(base);
+  // A preview is a *snapshot-shaped* object, not a partial one. It used to omit
+  // `integrity` (the checksum sat beside it in the response), so any client that
+  // rendered a preview the same way it renders a filed report read
+  // `snapshot.integrity.checksum` off undefined and crashed. Returning the same
+  // shape as a filed report costs nothing and removes the second code path.
+  return ok(c, {
+    snapshot: { ...base, integrity: { algorithm: "sha256" as const, checksum } },
+    checksum,
+    preview: true,
+  });
 }
 
 export async function listReportsHandler(c: Context) {

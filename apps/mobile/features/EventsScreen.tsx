@@ -64,8 +64,16 @@ export function EventsScreen({
       setError(null);
       try {
         if (tab === "discover") {
+          // "Discover" asks the server for a window rather than paging through
+          // everything it can see. The list is ordered oldest-first, so a campus
+          // with a year of finished events filled the first twenty pages with
+          // COMPLETED rows and tonight's event never appeared — the app looked
+          // empty. `from`/`to` are real filters on the endpoint.
+          const now = new Date().toISOString();
+          const window =
+            filter === "upcoming" ? { from: now } : filter === "past" ? { to: now } : {};
           const page = await api<Page<EventRow>>(
-            `/events${query({ q: appliedSearch, limit: 20, offset })}`,
+            `/events${query({ q: appliedSearch, limit: 20, offset, ...window })}`,
           );
           setEvents((old) => (offset ? [...old, ...page.items] : page.items));
           setHasMore(Boolean(page.hasMore));
@@ -82,7 +90,7 @@ export function EventsScreen({
         setLoading(false);
       }
     },
-    [tab, appliedSearch],
+    [tab, appliedSearch, filter],
   );
   useEffect(() => {
     void load();

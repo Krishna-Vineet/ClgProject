@@ -227,7 +227,11 @@ export function AnnouncementsPanel({
           if (!target) return;
           void action
             .run(async () => {
-              await api(`/announcements/${target.id}`, undefined, { method: "DELETE" });
+              // Withdrawing is a state change, not a delete: the row is kept so
+              // the audit trail and the read counts still mean something. The
+              // route is POST /announcements/:id/revoke — a DELETE here hit a
+              // 404 and the button did nothing.
+              await api(`/announcements/${target.id}/revoke`, {});
               return "Announcement withdrawn.";
             })
             .then(async (ok) => {

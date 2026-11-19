@@ -788,6 +788,9 @@ nav.tabs button.active .nav-count {
 
 /* ── Content ──────────────────────────────────────────────────────────── */
 .content {
+  position: relative;
+  /* Above the drifting backdrop so text never sits under a moving line. */
+  z-index: 1;
   padding: 30px 30px 72px;
   width: 100%;
   max-width: 1360px;
@@ -1610,16 +1613,19 @@ fieldset.span-2 legend {
   margin: 10px 0;
   background: color-mix(in srgb, var(--surface-2) 40%, transparent);
 }
+/* The empty state's illustration is drawn, not boxed: a bare sketch reads as an
+   illustration, while a sketch inside a rounded square reads as a broken icon. */
 .empty-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 76px;
+  height: 76px;
   display: grid;
   place-items: center;
-  background: var(--surface-2);
-  color: var(--muted);
+  color: color-mix(in srgb, var(--ink) 34%, transparent);
   flex: none;
-  border: 1px solid var(--line);
+  margin-bottom: 2px;
+}
+.empty-mark .sketch {
+  color: inherit;
 }
 .empty-copy {
   display: grid;
@@ -4926,15 +4932,719 @@ button.chip-toggle:hover:not(:disabled) {
   background: var(--surface-2);
   color: var(--ink);
 }
-button.chip-toggle.active {
+/* The selected chip is filled. Hovering it must not repaint it: the generic
+ * `:hover` rule above is more specific in effect (it comes later in the cascade
+ * for the same specificity), so an active-and-hovered chip used to fall back to
+ * the ink fill from the hover rule while its label colour stayed — the classic
+ * "text disappears on hover" flicker. Selecting a state and pointing at it are
+ * different things; only the border may respond to the pointer. */
+button.chip-toggle.active,
+button.chip-toggle.active:hover:not(:disabled),
+button.chip-toggle.active:focus-visible:not(:disabled) {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper-on-ink);
 }
 button.chip-toggle.active:hover:not(:disabled) {
-  background: var(--ink);
-  color: var(--paper-on-ink);
+  border-color: var(--ink-2, var(--ink));
+}
+button.chip-toggle:focus-visible {
+  outline: 2px solid var(--focus, var(--ink));
+  outline-offset: 2px;
 }
 .eligibility-builder .checkbox {
   padding-top: 4px;
+}
+
+/* A destructive action that is deliberately hard to reach by accident: it sits
+   at the bottom of the Edit tab, explains its own consequence, and is the only
+   red thing on the page. */
+.danger-zone {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--bad) 32%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bad) 5%, transparent);
+}
+.danger-zone p {
+  margin: 4px 0 0;
+  max-width: 62ch;
+}
+.danger-zone button {
+  flex: none;
+}
+@media (max-width: 720px) {
+  .danger-zone {
+    flex-direction: column;
+  }
+}
+
+/* The editing rules, shown as two labelled rules instead of one long sentence. */
+.edit-rules {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--paper));
+}
+.edit-rules h4 {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.edit-rules ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.edit-rules li {
+  line-height: 1.55;
+}
+.rule-tag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.rule-tag.now {
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+  color: var(--good);
+}
+.rule-tag.later {
+  background: color-mix(in srgb, var(--warn, #b4791f) 18%, transparent);
+  color: var(--warn, #8a5a10);
+}
+.form-group-note {
+  margin: -4px 0 4px;
+  font-size: 12px;
+}
+
+/* A cross-reference, not a control: it looks like a note so nobody tries to edit
+   eligibility from the quiz screen. */
+.quiz-eligibility-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+/* ── Quiz authoring ───────────────────────────────────────────────────────
+ * The old editor drew every option as a bare input with a hidden radio beside it,
+ * so the two things a person must be sure about — "which option is this?" and
+ * "which one is the answer?" — were the two things the layout did not show.
+ * Options are now numbered rows with the correct one visibly marked.
+ */
+.question-list {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.question-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px 12px;
+  background: var(--surface);
+}
+.question-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.question-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.question-points {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.question-prompt {
+  display: grid;
+  gap: 5px;
+}
+.question-prompt > span {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.question-prompt textarea {
+  font-size: 13.5px;
+}
+.option-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.option-mark {
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+/* The native radio keeps keyboard and screen-reader semantics; the visible
+   circle is drawn by the label so the letter can sit where the dot would be. */
+.option-mark input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.option-mark:focus-within {
+  outline: 2px solid var(--focus, var(--ink));
+  outline-offset: 2px;
+}
+.option-mark:hover {
+  border-color: var(--ink-2, var(--ink));
+  color: var(--ink);
+}
+.option-mark.active {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+  color: var(--good);
+}
+.option-text {
+  flex: 1;
+  min-width: 0;
+}
+.option-correct-tag {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--good);
+}
+.option-row.is-correct .option-text {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+}
+.question-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.question-points-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.question-points-input input {
+  width: 72px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+/* The saved paper: numbered questions, lettered options, answer marked only for
+   people who are allowed to see the key. */
+.paper-view {
+  display: grid;
+  gap: 16px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.paper-q {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.5;
+}
+.paper-num {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 2px;
+}
+.paper-pts {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.paper-options {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 0 26px;
+  padding: 0;
+  list-style: none;
+}
+.paper-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs, 4px);
+  font-size: 13px;
+}
+.paper-letter {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.paper-options li.is-answer {
+  background: color-mix(in srgb, var(--good) 10%, transparent);
+}
+.paper-answer-tag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--good);
+}
+.tiny {
+  font-size: 11.5px;
+  padding: 3px 8px;
+}
+
+/* Text that only assistive tech should announce. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Secondary line inside a table cell — the email under a participant's name. */
+.cell-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.mono a {
+  color: inherit;
+}
+
+/* A resource name is a fact about the request, not a caveat, so it sits below
+   the permission line in the same small type but in the body colour. */
+.resource-line {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2, var(--ink));
+}
+
+/* ── Loaders ──────────────────────────────────────────────────────────────
+ * One vocabulary for "something is happening": a spinner with an animated dash
+ * (so the motion reads at any size), skeleton shapes in the rhythm of the real
+ * content, and a thin progress bar for route changes.
+ */
+.spinner {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  vertical-align: -2px;
+}
+.spinner svg {
+  animation: spinner-rotate 1.15s linear infinite;
+  transform-origin: 50% 50%;
+}
+.spinner-track,
+.spinner-head {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.spinner-track {
+  stroke: color-mix(in srgb, currentColor 18%, transparent);
+}
+.spinner-head {
+  stroke: currentColor;
+  stroke-dasharray: 44 14;
+  animation: spinner-dash 1.4s ease-in-out infinite;
+}
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spinner-dash {
+  0% {
+    stroke-dasharray: 6 52;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 40 18;
+    stroke-dashoffset: -10;
+  }
+  100% {
+    stroke-dasharray: 6 52;
+    stroke-dashoffset: -56;
+  }
+}
+.busy-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.loading-panel {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0 16px;
+}
+.loading-panel.is-compact {
+  padding: 4px 0 8px;
+}
+.loading-panel-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+
+/* Veil over the box that is working. The parent must be positioned; panels get
+   that from `.card { position: relative }` below. */
+.box-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--paper) 62%, transparent);
+  backdrop-filter: blur(1.5px);
+  animation: fade-in 0.18s var(--ease) both;
+}
+.box-loading-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px -18px rgb(0 0 0 / 0.35);
+  color: var(--ink-2);
+}
+.card {
+  position: relative;
+}
+
+/* Boot / full-page loader. */
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  opacity: 0;
+  transition: opacity 0.22s var(--ease);
+  background: var(--paper);
+}
+.page-loader.is-visible {
+  opacity: 1;
+}
+.page-loader-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 160px;
+  height: 120px;
+  color: var(--ink);
+}
+.page-loader-sketch {
+  position: absolute;
+  inset: 0;
+  width: 160px;
+  height: 160px;
+  color: var(--line-strong);
+  animation: sketch-float 6s ease-in-out infinite;
+}
+.page-loader-mark .spinner {
+  color: var(--ink);
+}
+.page-loader-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.page-loader-track {
+  width: 180px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+.page-loader-bar {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--ink);
+  animation: loader-slide 1.25s var(--ease) infinite;
+}
+@keyframes loader-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+@keyframes sketch-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(-1.2deg);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Route transition bar: fixed to the top of the viewport, above the shell. */
+.route-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 95;
+  background: transparent;
+}
+.route-progress span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  box-shadow: 0 0 12px -2px var(--ink);
+  transition: width 0.24s var(--ease);
+}
+
+.route-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.route-error p {
+  margin: 2px 0 0;
+}
+.route-error button {
+  margin-left: auto;
+}
+
+/* ── Sketches ─────────────────────────────────────────────────────────────
+ * Hand-drawn line art. Strokes are drawn in on first paint (dash offset), then
+ * a few of them breathe forever. `prefers-reduced-motion` turns all of it off —
+ * the art stays, the movement stops.
+ */
+.sketch {
+  display: block;
+  overflow: visible;
+  color: color-mix(in srgb, var(--ink) 46%, transparent);
+  pointer-events: none;
+}
+.sketch-line {
+  stroke-dasharray: 620;
+  stroke-dashoffset: 620;
+  animation: sketch-draw 1.1s var(--ease) forwards;
+}
+@keyframes sketch-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A backdrop of drifting sketches for large empty surfaces. Fixed so it does not
+   scroll away, very low contrast, and behind every panel. */
+.sketch-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+.sketch-backdrop .sketch {
+  position: absolute;
+  color: inherit;
+}
+.sketch-backdrop .sketch-line {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  animation: none;
+}
+.drift-a {
+  top: -60px;
+  right: -40px;
+  transform: rotate(-6deg);
+  animation: drift-slow 34s ease-in-out infinite alternate;
+}
+.drift-b {
+  bottom: 6%;
+  left: -50px;
+  transform: rotate(9deg);
+  animation: drift-slow 27s ease-in-out infinite alternate-reverse;
+}
+.drift-c {
+  top: 42%;
+  right: 4%;
+  transform: rotate(14deg);
+  animation: drift-fast 21s ease-in-out infinite alternate;
+}
+.drift-d {
+  top: 14%;
+  left: 22%;
+  transform: rotate(-12deg);
+  animation: drift-fast 18s ease-in-out infinite alternate-reverse;
+}
+.drift-e {
+  bottom: -70px;
+  right: 18%;
+  transform: rotate(-4deg);
+  animation: drift-slow 40s ease-in-out infinite alternate;
+}
+@keyframes drift-slow {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 18px -14px;
+  }
+}
+@keyframes drift-fast {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: -14px 12px;
+  }
+}
+
+.sketch-underline {
+  display: block;
+  width: min(240px, 46%);
+  height: 9px;
+  margin-top: 6px;
+  color: color-mix(in srgb, var(--ink) 26%, transparent);
+  overflow: visible;
+}
+.sketch-underline path {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: sketch-draw 0.85s var(--ease) 0.1s forwards;
+}
+
+.connector-line {
+  animation: connector-draw 1.4s var(--ease) 0.2s forwards;
+}
+@keyframes connector-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Decorative motion is optional. */
+@media (prefers-reduced-motion: reduce) {
+  .sketch-line,
+  .sketch-underline path,
+  .connector-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .drift-a,
+  .drift-b,
+  .drift-c,
+  .drift-d,
+  .drift-e,
+  .page-loader-sketch {
+    animation: none;
+  }
+  .spinner svg,
+  .spinner-head {
+    animation-duration: 3s;
+  }
+}
+
+/* The page title is the one place every section starts, so it carries the small
+   motion: the heading rises and a drawn underline sweeps in beneath it. */
+.page-head h1 {
+  position: relative;
+}
+.page-head h1 .sketch-underline {
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  margin: 0;
+}
+
+/* Micro-interaction: cards lift a hair on hover. Not on touch, where there is no
+   hover state to leave gracefully. */
+@media (hover: hover) {
+  .card {
+    transition: box-shadow 0.22s var(--ease), border-color 0.22s var(--ease), transform 0.22s
+      var(--ease);
+  }
+  .card:hover {
+    border-color: var(--line-strong);
+    box-shadow: 0 18px 44px -34px rgb(0 0 0 / 0.4);
+  }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmDialog, FormDialog, Loading, useAction } from "../components/feedback";
-import { Card, Empty, ErrorNote, Field, formatWhen } from "../components/ui";
+import { Card, Empty, Field, formatWhen, useNotice } from "../components/ui";
 import { api, errorMessage } from "../lib/api";
 import type { EventRow } from "../lib/types";
 
@@ -31,6 +31,8 @@ export function AnnouncementsPanel({
   const action = useAction();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [items, setItems] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [more, setMore] = useState(false);
@@ -100,8 +102,6 @@ export function AnnouncementsPanel({
 
   return (
     <div className="stack">
-      <ErrorNote message={error} />
-
       {canManage && (
         <Card
           title="Announcements"
@@ -227,7 +227,11 @@ export function AnnouncementsPanel({
           if (!target) return;
           void action
             .run(async () => {
-              await api(`/announcements/${target.id}`, undefined, { method: "DELETE" });
+              // Withdrawing is a state change, not a delete: the row is kept so
+              // the audit trail and the read counts still mean something. The
+              // route is POST /announcements/:id/revoke — a DELETE here hit a
+              // 404 and the button did nothing.
+              await api(`/announcements/${target.id}/revoke`, {});
               return "Announcement withdrawn.";
             })
             .then(async (ok) => {

@@ -672,6 +672,15 @@ export const operations: Operation[] = [
     description: "Drafts only. After publication use POST /events/:id/revisions.",
   },
   {
+    method: "delete",
+    path: "/events/:id",
+    tag: "Events",
+    summary: "Delete a draft that was never used",
+    auth: true,
+    description:
+      "Drafts only, and only by the event's club coordinator. Refuses with INVALID_STATE_TRANSITION once the event is anything but a draft, and with CONFLICT when registrations or scan logs exist — those events are cancelled instead, so history survives.",
+  },
+  {
     method: "post",
     path: "/events/:id/submit",
     tag: "Events",

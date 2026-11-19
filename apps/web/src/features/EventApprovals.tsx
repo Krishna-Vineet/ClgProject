@@ -5,12 +5,11 @@ import { Icon } from "../components/icons";
 import {
   ApprovalBadge,
   Empty,
-  ErrorNote,
   Field,
-  SuccessNote,
   formatWhen,
   fromLocalInput,
   toLocalInput,
+  useNotice,
 } from "../components/ui";
 import { api, errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
@@ -85,6 +84,9 @@ export function EventApprovals({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Every panel message is a toast: it appears where the eye is, including
+  // over an open dialog, instead of in a bar at the top of the card.
+  useNotice(error, notice);
 
   const event = bundle.event;
   const summary = bundle.summary;
@@ -274,9 +276,6 @@ export function EventApprovals({
 
   return (
     <div className="stack">
-      <ErrorNote message={error} />
-      <SuccessNote message={notice} />
-
       {bundle.bundle === null ? (
         canManage ? (
           <section className="approval-block">

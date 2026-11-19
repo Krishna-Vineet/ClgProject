@@ -7,7 +7,7 @@ import {
 } from "@campusops/shared/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Loading, Pager, useAction } from "../components/feedback";
-import { Empty, ErrorNote, Field, formatWhen } from "../components/ui";
+import { Empty, Field, formatWhen, useNotice } from "../components/ui";
 import { type Page, api, downloadBlob, errorMessage, query } from "../lib/api";
 import { PAGE_SIZE } from "../lib/constants";
 import type { EventRow } from "../lib/types";
@@ -70,6 +70,8 @@ export function ComplaintsPanel({ event, canManage }: { event: EventRow; canMana
     activeLocations: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Action results are toasts; only a standing condition stays on the page.
+  useNotice(error, null);
   const [offset, setOffset] = useState(0);
   const [filter, setFilter] = useState({ status: "", locationId: "" });
   const [view, setView] = useState<"inbox" | "points">("inbox");
@@ -192,7 +194,6 @@ export function ComplaintsPanel({ event, canManage }: { event: EventRow; canMana
 
   return (
     <>
-      <ErrorNote message={error} />
       {summary && (
         <div className="stats">
           {COMPLAINT_STATUSES.map((status) => (

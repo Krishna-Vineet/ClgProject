@@ -10,6 +10,7 @@ import {
   Note,
   Row,
   Screen,
+  ScreenOverlay,
   Title,
   colors,
 } from "../components/ui";
@@ -130,224 +131,230 @@ export function QuizScreen({
   const answered = Object.keys(answers).length;
 
   return (
-    <Screen>
-      <Title eyebrow="Seat allocation" title="Quiz" subtitle={eventTitle} />
-      <Button label="Back to event" variant="ghost" onPress={onClose} />
-      <Note message={error} tone={error?.startsWith("Time is up") ? "warn" : "bad"} />
+    <>
+      <ScreenOverlay visible={busy} label="Checking your answers" />
+      <Screen>
+        <Title eyebrow="Seat allocation" title="Quiz" subtitle={eventTitle} />
+        <Button label="Back to event" variant="ghost" onPress={onClose} />
+        <Note message={error} tone={error?.startsWith("Time is up") ? "warn" : "bad"} />
 
-      {!quiz && (
-        <Empty
-          title="No quiz open"
-          detail="The coordinator has not opened a quiz for this event yet."
-        />
-      )}
+        {!quiz && (
+          <Empty
+            doodle="book"
+            title="No quiz open"
+            detail="The coordinator has not opened a quiz for this event yet."
+          />
+        )}
 
-      {/* ── Taking the paper ───────────────────────────────────────────── */}
-      {paper && (
-        <>
-          <Card title="Time remaining">
-            <Text
-              accessibilityLiveRegion="polite"
-              style={{
-                fontSize: 30,
-                fontWeight: "700",
-                color: left <= 60 ? colors.bad : colors.ink,
-              }}
-            >
-              {clock(left)}
-            </Text>
-            <Muted>
-              {answered} of {paper.questions.length} answered. Your answers are sent when you submit
-              or when the timer ends.
-            </Muted>
-          </Card>
-
-          {paper.questions.map((q, index) => (
-            <Card key={q.id} title={`Question ${index + 1} of ${paper.questions.length}`}>
-              <Text style={{ color: colors.ink, lineHeight: 22, marginBottom: 10 }}>
-                {q.prompt}
+        {/* ── Taking the paper ───────────────────────────────────────────── */}
+        {paper && (
+          <>
+            <Card title="Time remaining">
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{
+                  fontSize: 30,
+                  fontWeight: "700",
+                  color: left <= 60 ? colors.bad : colors.ink,
+                }}
+              >
+                {clock(left)}
               </Text>
-              <View style={{ gap: 8 }}>
-                {q.options.map((option, oi) => {
-                  const selected = answers[q.id] === oi;
-                  return (
-                    <Button
-                      key={`${q.id}-${option}`}
-                      label={`${String.fromCharCode(65 + oi)}. ${option}`}
-                      variant={selected ? "primary" : "ghost"}
-                      onPress={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
-                      testID={`option-${index}-${oi}`}
-                    />
-                  );
-                })}
-              </View>
               <Muted>
-                {q.points} point{q.points === 1 ? "" : "s"}
+                {answered} of {paper.questions.length} answered. Your answers are sent when you
+                submit or when the timer ends.
               </Muted>
             </Card>
-          ))}
 
-          <Button
-            label={`Submit answers (${answered}/${paper.questions.length})`}
-            busy={busy}
-            onPress={() => void submit()}
-            testID="submit-quiz"
-          />
-          <Muted>You get one attempt. Submitting cannot be undone.</Muted>
-        </>
-      )}
-
-      {/* A pause mid-attempt is not an interruption: the student carries on, but
-          they should know why nobody new is joining and that they are not stuck. */}
-      {paper && view?.phase === "PAUSED" && (
-        <Note
-          message="Coordinators have paused this quiz for new starters. Your attempt is still running — finish and submit before your timer ends."
-          tone="warn"
-        />
-      )}
-
-      {/* ── Result ─────────────────────────────────────────────────────── */}
-      {!paper && result && (
-        <Card title={result.expired ? "Time ran out" : "Your result"}>
-          {result.expired ? (
-            <Note
-              message="Your attempt expired before it was submitted, so it scored nothing."
-              tone="warn"
-            />
-          ) : (
-            <>
-              <Row label="Score" value={`${result.score ?? 0} / ${result.maxScore}`} />
-              <Row label="Percentage" value={`${result.percentScore ?? 0}%`} />
-              {result.correctCount !== undefined && (
-                <Row
-                  label="Correct"
-                  value={`${result.correctCount} of ${result.totalQuestions ?? 0}`}
-                />
-              )}
-              {result.qualified !== null && (
-                <View style={{ marginTop: 8 }}>
-                  <Badge
-                    label={result.qualified ? "Qualified" : "Below the pass mark"}
-                    tone={result.qualified ? "good" : "bad"}
-                  />
+            {paper.questions.map((q, index) => (
+              <Card key={q.id} title={`Question ${index + 1} of ${paper.questions.length}`}>
+                <Text style={{ color: colors.ink, lineHeight: 22, marginBottom: 10 }}>
+                  {q.prompt}
+                </Text>
+                <View style={{ gap: 8 }}>
+                  {q.options.map((option, oi) => {
+                    const selected = answers[q.id] === oi;
+                    return (
+                      <Button
+                        key={`${q.id}-${option}`}
+                        label={`${String.fromCharCode(65 + oi)}. ${option}`}
+                        variant={selected ? "primary" : "ghost"}
+                        onPress={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
+                        testID={`option-${index}-${oi}`}
+                      />
+                    );
+                  })}
                 </View>
-              )}
-              {result.outcome && (
-                <View style={{ marginTop: 8 }}>
-                  <Badge
-                    label={
-                      result.outcome === "CONFIRMED"
-                        ? "Seat confirmed"
-                        : result.outcome === "WAITLISTED"
-                          ? "On the waitlist"
-                          : "No seat"
-                    }
-                    tone={result.outcome === "CONFIRMED" ? "good" : "warn"}
-                  />
-                </View>
-              )}
-            </>
-          )}
-        </Card>
-      )}
-
-      {/* ── Before starting / after finishing ──────────────────────────── */}
-      {!paper && quiz && (
-        <Card title="How this quiz works">
-          <Row
-            label="Seat rule"
-            value={
-              quiz.mode === "TOP_N"
-                ? "Highest scores get the seats"
-                : "First to reach the pass mark, until full"
-            }
-          />
-          <Row label="Questions" value={String(quiz.questionCount)} />
-          <Row
-            label="Time per attempt"
-            value={`${Math.round(quiz.durationSeconds / 60)} minutes`}
-          />
-          {quiz.passScore !== null && <Row label="Pass mark" value={`${quiz.passScore}%`} />}
-          <Row label="Opens" value={when(quiz.opensAt, timeZone)} />
-          <Row label="Closes" value={when(quiz.closesAt, timeZone)} />
-          <Muted>
-            {quiz.mode === "TOP_N"
-              ? "Everyone's scores are ranked when the quiz closes. Ties are broken by who submitted first."
-              : "As soon as you reach the pass mark you take the next free seat. If the seats are gone you join the waitlist."}
-          </Muted>
-          {quiz.instructions ? (
-            <View style={{ marginTop: 8 }}>
-              <Muted>From the coordinator</Muted>
-              <Text style={{ color: colors.ink, lineHeight: 20 }}>{quiz.instructions}</Text>
-            </View>
-          ) : null}
-        </Card>
-      )}
-
-      {!paper && quiz && !attempt && (
-        <>
-          {/*
-            Three different situations used to share one message. A paused quiz is
-            not a closed one: the student can still get in, so tell them who to
-            ask and that their chance has not gone.
-          */}
-          {view?.phase === "PAUSED" ? (
-            <Note
-              message="The coordinators have paused this quiz. You cannot start right now — contact your club faculty or lead, and try again once it resumes."
-              tone="warn"
-            />
-          ) : view?.windowOpen ? (
-            <Button label="Start my attempt" busy={busy} onPress={start} testID="start-quiz" />
-          ) : (
-            <Note
-              message={
-                view?.phase === "WINDOW_CLOSED" || quiz.status === "CLOSED"
-                  ? "This quiz has closed. You did not start an attempt in time."
-                  : `The quiz opens ${when(quiz.opensAt, timeZone)}.`
-              }
-              tone="neutral"
-            />
-          )}
-          <Muted>Once you start, the timer runs even if you close the app.</Muted>
-        </>
-      )}
-
-      {!paper && attempt && (
-        <Card title={attempt.status === "IN_PROGRESS" ? "Attempt in progress" : "Attempt finished"}>
-          <Row label="Status" value={attempt.status.replace(/_/g, " ").toLowerCase()} />
-          {attempt.status === "IN_PROGRESS" && (
-            <>
-              <Row label="Time left" value={clock(attempt.secondsLeft)} />
-              <Button label="Resume attempt" busy={busy} onPress={start} testID="resume-quiz" />
-              <Muted>The clock kept running while you were away.</Muted>
-            </>
-          )}
-          {attempt.status !== "IN_PROGRESS" && (
-            <>
-              {attempt.percentScore !== null && (
-                <Row label="Your score" value={`${attempt.percentScore}%`} />
-              )}
-              {attempt.rank !== null && <Row label="Rank" value={`#${attempt.rank}`} />}
-              {view?.registration && (
-                <Row
-                  label="Place"
-                  value={
-                    view.registration.status === "WAITLISTED" && view.registration.queuePosition
-                      ? `Waitlisted #${view.registration.queuePosition}`
-                      : view.registration.status.toLowerCase()
-                  }
-                />
-              )}
-              {quiz?.allocatedAt === null && quiz?.mode === "TOP_N" && (
                 <Muted>
-                  Seats are handed out after the quiz closes. Your rank may still move as others
-                  submit.
+                  {q.points} point{q.points === 1 ? "" : "s"}
                 </Muted>
-              )}
-            </>
-          )}
-        </Card>
-      )}
-    </Screen>
+              </Card>
+            ))}
+
+            <Button
+              label={`Submit answers (${answered}/${paper.questions.length})`}
+              busy={busy}
+              onPress={() => void submit()}
+              testID="submit-quiz"
+            />
+            <Muted>You get one attempt. Submitting cannot be undone.</Muted>
+          </>
+        )}
+
+        {/* A pause mid-attempt is not an interruption: the student carries on, but
+            they should know why nobody new is joining and that they are not stuck. */}
+        {paper && view?.phase === "PAUSED" && (
+          <Note
+            message="Coordinators have paused this quiz for new starters. Your attempt is still running — finish and submit before your timer ends."
+            tone="warn"
+          />
+        )}
+
+        {/* ── Result ─────────────────────────────────────────────────────── */}
+        {!paper && result && (
+          <Card title={result.expired ? "Time ran out" : "Your result"}>
+            {result.expired ? (
+              <Note
+                message="Your attempt expired before it was submitted, so it scored nothing."
+                tone="warn"
+              />
+            ) : (
+              <>
+                <Row label="Score" value={`${result.score ?? 0} / ${result.maxScore}`} />
+                <Row label="Percentage" value={`${result.percentScore ?? 0}%`} />
+                {result.correctCount !== undefined && (
+                  <Row
+                    label="Correct"
+                    value={`${result.correctCount} of ${result.totalQuestions ?? 0}`}
+                  />
+                )}
+                {result.qualified !== null && (
+                  <View style={{ marginTop: 8 }}>
+                    <Badge
+                      label={result.qualified ? "Qualified" : "Below the pass mark"}
+                      tone={result.qualified ? "good" : "bad"}
+                    />
+                  </View>
+                )}
+                {result.outcome && (
+                  <View style={{ marginTop: 8 }}>
+                    <Badge
+                      label={
+                        result.outcome === "CONFIRMED"
+                          ? "Seat confirmed"
+                          : result.outcome === "WAITLISTED"
+                            ? "On the waitlist"
+                            : "No seat"
+                      }
+                      tone={result.outcome === "CONFIRMED" ? "good" : "warn"}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </Card>
+        )}
+
+        {/* ── Before starting / after finishing ──────────────────────────── */}
+        {!paper && quiz && (
+          <Card title="How this quiz works">
+            <Row
+              label="Seat rule"
+              value={
+                quiz.mode === "TOP_N"
+                  ? "Highest scores get the seats"
+                  : "First to reach the pass mark, until full"
+              }
+            />
+            <Row label="Questions" value={String(quiz.questionCount)} />
+            <Row
+              label="Time per attempt"
+              value={`${Math.round(quiz.durationSeconds / 60)} minutes`}
+            />
+            {quiz.passScore !== null && <Row label="Pass mark" value={`${quiz.passScore}%`} />}
+            <Row label="Opens" value={when(quiz.opensAt, timeZone)} />
+            <Row label="Closes" value={when(quiz.closesAt, timeZone)} />
+            <Muted>
+              {quiz.mode === "TOP_N"
+                ? "Everyone's scores are ranked when the quiz closes. Ties are broken by who submitted first."
+                : "As soon as you reach the pass mark you take the next free seat. If the seats are gone you join the waitlist."}
+            </Muted>
+            {quiz.instructions ? (
+              <View style={{ marginTop: 8 }}>
+                <Muted>From the coordinator</Muted>
+                <Text style={{ color: colors.ink, lineHeight: 20 }}>{quiz.instructions}</Text>
+              </View>
+            ) : null}
+          </Card>
+        )}
+
+        {!paper && quiz && !attempt && (
+          <>
+            {/*
+              Three different situations used to share one message. A paused quiz is
+              not a closed one: the student can still get in, so tell them who to
+              ask and that their chance has not gone.
+            */}
+            {view?.phase === "PAUSED" ? (
+              <Note
+                message="The coordinators have paused this quiz. You cannot start right now — contact your club faculty or lead, and try again once it resumes."
+                tone="warn"
+              />
+            ) : view?.windowOpen ? (
+              <Button label="Start my attempt" busy={busy} onPress={start} testID="start-quiz" />
+            ) : (
+              <Note
+                message={
+                  view?.phase === "WINDOW_CLOSED" || quiz.status === "CLOSED"
+                    ? "This quiz has closed. You did not start an attempt in time."
+                    : `The quiz opens ${when(quiz.opensAt, timeZone)}.`
+                }
+                tone="neutral"
+              />
+            )}
+            <Muted>Once you start, the timer runs even if you close the app.</Muted>
+          </>
+        )}
+
+        {!paper && attempt && (
+          <Card
+            title={attempt.status === "IN_PROGRESS" ? "Attempt in progress" : "Attempt finished"}
+          >
+            <Row label="Status" value={attempt.status.replace(/_/g, " ").toLowerCase()} />
+            {attempt.status === "IN_PROGRESS" && (
+              <>
+                <Row label="Time left" value={clock(attempt.secondsLeft)} />
+                <Button label="Resume attempt" busy={busy} onPress={start} testID="resume-quiz" />
+                <Muted>The clock kept running while you were away.</Muted>
+              </>
+            )}
+            {attempt.status !== "IN_PROGRESS" && (
+              <>
+                {attempt.percentScore !== null && (
+                  <Row label="Your score" value={`${attempt.percentScore}%`} />
+                )}
+                {attempt.rank !== null && <Row label="Rank" value={`#${attempt.rank}`} />}
+                {view?.registration && (
+                  <Row
+                    label="Place"
+                    value={
+                      view.registration.status === "WAITLISTED" && view.registration.queuePosition
+                        ? `Waitlisted #${view.registration.queuePosition}`
+                        : view.registration.status.toLowerCase()
+                    }
+                  />
+                )}
+                {quiz?.allocatedAt === null && quiz?.mode === "TOP_N" && (
+                  <Muted>
+                    Seats are handed out after the quiz closes. Your rank may still move as others
+                    submit.
+                  </Muted>
+                )}
+              </>
+            )}
+          </Card>
+        )}
+      </Screen>
+    </>
   );
 }

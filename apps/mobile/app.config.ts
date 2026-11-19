@@ -21,8 +21,45 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
    * docs/mobile.md rather than half-implemented here.
    */
   userInterfaceStyle: "light",
-  ios: { supportsTablet: true, bundleIdentifier: "local.campusops.demo" },
-  android: { package: "local.campusops.demo" },
+  /**
+   * iOS and Android are both first-class targets, and both are configured here
+   * rather than in an `app.json` that Android-only projects tend to leave thin.
+   *
+   *   buildNumber/versionCode  required before any store upload; without them
+   *                            EAS rejects the build with no useful explanation
+   *   infoPlist                the camera string is what iOS shows in the
+   *                            permission sheet — an empty one gets the app
+   *                            rejected, and a vague one confuses the student
+   *   ITSAppUsesNonExemptEncryption: false  the app only uses HTTPS and the
+   *                            keychain, which are exempt; declaring it avoids a
+   *                            compliance question on every submission
+   */
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "local.campusops.demo",
+    buildNumber: "1",
+    infoPlist: {
+      NSCameraUsageDescription:
+        "CampusOps uses the camera to scan event passes at the gate and to report an issue at a campus location.",
+      ITSAppUsesNonExemptEncryption: false,
+      NSPhotoLibraryUsageDescription:
+        "CampusOps needs photo access only when you choose a picture of your student ID for verification.",
+    },
+  },
+  android: {
+    package: "local.campusops.demo",
+    versionCode: 1,
+    // New Architecture is the default on RN 0.88; stated so a future downgrade
+    // is a deliberate edit rather than a surprise at build time.
+    softwareKeyboardLayoutMode: "resize",
+    adaptiveIcon: { backgroundColor: "#f3f0e8" },
+  },
+  /**
+   * Both platforms, explicitly. `platforms` is what `expo start` and
+   * `expo export` read; leaving it out means "all supported", which is right
+   * today but does not document that iOS is a supported target.
+   */
+  platforms: ["ios", "android", "web"],
   web: { bundler: "metro" },
   plugins: [
     [

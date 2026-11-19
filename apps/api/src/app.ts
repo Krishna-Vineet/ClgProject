@@ -37,6 +37,7 @@ import { eventRegistrationRoutes, myRegistrationRoutes } from "./modules/registr
 import { resourceRoutes, resourceUnitRoutes } from "./modules/resources/routes";
 import { searchRoutes } from "./modules/search/routes";
 import { storageRoutes } from "./modules/storage/routes";
+import { storagePublicConfig } from "./modules/storage/service";
 import { buildOpenApiSpec } from "./openapi/spec";
 import { ApiError } from "./utils/api-error";
 import { log } from "./utils/logger";
@@ -92,6 +93,8 @@ export function createApp() {
       emailMode: effectiveEmailMode(),
       exposeDemoOtp: shouldExposeDemoOtp(),
       storageMode: env.STORAGE_MODE,
+      // Why uploads are off, in the words of the variable that needs fixing.
+      storageReason: storagePublicConfig().reason,
       campusTimezone: env.CAMPUS_TIMEZONE,
       institutionName: env.INSTITUTION_NAME,
       complaintQrBase: env.COMPLAINT_QR_BASE,

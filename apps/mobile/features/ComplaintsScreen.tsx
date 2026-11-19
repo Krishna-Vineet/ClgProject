@@ -17,6 +17,7 @@ import {
   Note,
   Row,
   Screen,
+  ScreenOverlay,
   Title,
   colors,
 } from "../components/ui";
@@ -198,48 +199,52 @@ export function ComplaintsScreen({
     );
 
   return (
-    <Screen>
-      <Title
-        eyebrow="Event help"
-        title="My reported issues"
-        subtitle="Scan a location poster to raise a new issue."
-      />
-      <Button label="Scan a location QR" onPress={onScan} />
-      <Note message={notice} tone="good" />
-      <Note message={error} />
-      {loading ? (
-        <Loading />
-      ) : items.length === 0 ? (
-        <Empty
-          title="No issues reported"
-          detail="Reports you send from an event location will appear here."
+    <>
+      <ScreenOverlay visible={busy} label="Sending your report" />
+      <Screen>
+        <Title
+          eyebrow="Event help"
+          title="My reported issues"
+          subtitle="Scan a location poster to raise a new issue."
         />
-      ) : (
-        items.map((item) => (
-          <Pressable key={item.id} accessibilityRole="button" onPress={() => void open(item.id)}>
-            <Card>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                <Text style={{ fontWeight: "700", color: colors.ink, flex: 1 }}>
-                  {item.locationLabel}
+        <Button label="Scan a location QR" onPress={onScan} />
+        <Note message={notice} tone="good" />
+        <Note message={error} />
+        {loading ? (
+          <Loading />
+        ) : items.length === 0 ? (
+          <Empty
+            doodle="megaphone"
+            title="No issues reported"
+            detail="Reports you send from an event location will appear here."
+          />
+        ) : (
+          items.map((item) => (
+            <Pressable key={item.id} accessibilityRole="button" onPress={() => void open(item.id)}>
+              <Card>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                  <Text style={{ fontWeight: "700", color: colors.ink, flex: 1 }}>
+                    {item.locationLabel}
+                  </Text>
+                  <Badge
+                    label={statusLabel(item.status)}
+                    tone={item.status === "RESOLVED" || item.status === "CLOSED" ? "good" : "warn"}
+                  />
+                </View>
+                <Muted>
+                  {item.eventTitle} · {when(item.createdAt, tz)}
+                </Muted>
+                <Text numberOfLines={2} style={{ color: colors.ink }}>
+                  {item.description}
                 </Text>
-                <Badge
-                  label={statusLabel(item.status)}
-                  tone={item.status === "RESOLVED" || item.status === "CLOSED" ? "good" : "warn"}
-                />
-              </View>
-              <Muted>
-                {item.eventTitle} · {when(item.createdAt, tz)}
-              </Muted>
-              <Text numberOfLines={2} style={{ color: colors.ink }}>
-                {item.description}
-              </Text>
-            </Card>
-          </Pressable>
-        ))
-      )}
-      {hasMore && (
-        <Button label="Load more" variant="ghost" onPress={() => void load(items.length)} />
-      )}
-    </Screen>
+              </Card>
+            </Pressable>
+          ))
+        )}
+        {hasMore && (
+          <Button label="Load more" variant="ghost" onPress={() => void load(items.length)} />
+        )}
+      </Screen>
+    </>
   );
 }

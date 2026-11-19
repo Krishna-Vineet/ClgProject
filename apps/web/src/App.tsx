@@ -12,10 +12,13 @@ import {
 } from "react";
 import { ToastProvider } from "./components/feedback";
 import { Icon, Logo } from "./components/icons";
+import { FullPageLoader, RouteProgress } from "./components/loaders";
+import { SketchBackdrop, SketchUnderline } from "./components/sketch";
 import { Card, Kbd, PanelSkeleton, formatDay } from "./components/ui";
 import { AuthPanel } from "./features/AuthPanel";
 import { type DashboardData, DashboardPanel } from "./features/DashboardPanel";
 import { type Page, api, query } from "./lib/api";
+import { beginRoute, endRouteSoon } from "./lib/router";
 import { SessionProvider, useSession } from "./lib/session";
 import type { EventRow } from "./lib/types";
 
@@ -58,6 +61,7 @@ type Config = {
   emailMode: string | null;
   exposeDemoOtp: boolean;
   storageMode: string;
+  storageReason?: string | null;
   institutionName?: string;
 };
 type Tab =
@@ -308,7 +312,10 @@ function Shell() {
     const list: Tab[] = ["dashboard"];
     if (isClubMember || isAdmin || isSenior) list.push("events");
     if (isStaff) list.push("approvals");
-    if (isFaculty || isSenior) list.push("verification");
+    // Verification is a faculty action. An HOD/Dean has the Students page,
+    // which shows the same people — including unverified ones — with the detail
+    // they actually need. A queue they cannot decide was just a dead end.
+    if (isFaculty) list.push("verification");
     if (isAdmin || isSenior) list.push("students");
     list.push("resources");
     if (isClubMember || isStaff) list.push("clubs", "reports");
@@ -360,8 +367,14 @@ function Shell() {
       return;
     }
     if (isTab(next)) {
+      // Mark the transition before the state change so the progress bar can
+      // appear in the same paint as the click, and clear it once the new tab has
+      // actually been painted. Without this the gap between click and chunk
+      // arrival looks like a dropped click.
+      beginRoute();
       setTab(next);
       location.hash = `/${next}`;
+      endRouteSoon();
     }
   }, []);
   const openEvent = useCallback(
@@ -416,17 +429,9 @@ function Shell() {
   }, [pageTitle, attention]);
 
   if (loading)
-    return (
-      <div className="boot-screen" aria-busy="true" aria-live="polite">
-        <span className="boot-mark" aria-hidden="true">
-          <Icon name="ticket" size={21} />
-        </span>
-        <div className="boot-copy">
-          <b>CampusOps</b>
-          <span>Restoring your session</span>
-        </div>
-      </div>
-    );
+    // A real loader, not a static word: the sketched arc draws itself in and the
+    // spinner carries the motion, so a slow cold start reads as progress.
+    return <FullPageLoader label="Restoring your session" />;
 
   if (!me)
     return (
@@ -623,7 +628,11 @@ function Shell() {
       return;
     }
     if (item.kind === "person") {
-      navigate("admin");
+      // Go where the person can actually be opened. Every person result used to
+      // send everyone to Administration, which faculty and HOD/Dean cannot open at
+      // all — the search found the student and then walked into a locked door. The
+      // API only returns people this role can already see on a page it can reach.
+      navigate(isAdmin ? "admin" : isSenior ? "students" : "verification");
       return;
     }
     if (item.kind === "tab") {
@@ -744,8 +753,14 @@ function Shell() {
               <span>
                 Email <strong>{config?.emailMode ?? "—"}</strong>
               </span>
-              <span>
-                Files <strong>{config?.storageMode ?? "—"}</strong>
+              <span title={config?.storageReason ?? undefined}>
+                Files{" "}
+                <strong>
+                  {/* "Files s3" told an operator the variable's value; what they
+                      need is whether uploads work, and the reason when they do
+                      not — which the API now reports. */}
+                  {config?.storageMode === "s3" ? "private" : "off"}
+                </strong>
               </span>
             </div>
             {config?.demoMode && <span className="badge warn">Demo mode</span>}
@@ -997,7 +1012,7 @@ function Shell() {
                     </span>
                   </button>
                 )}
-                {(isFaculty || isSenior) && dash && dash.work.verificationPending > 0 && (
+                {isFaculty && dash && dash.work.verificationPending > 0 && (
                   <button
                     type="button"
                     className="popover-item"
@@ -1060,6 +1075,8 @@ function Shell() {
           </div>
         </header>
 
+        <RouteProgress />
+        <SketchBackdrop />
         <main id="main-content" className="content">
           {!online && (
             <output className="offline-bar">
@@ -1085,7 +1102,10 @@ function Shell() {
               <div className="page-head">
                 <div>
                   <p className="eyebrow">{TAB_META[active].group}</p>
-                  <h1>{tabLabel(active)}</h1>
+                  <h1>
+                    {tabLabel(active)}
+                    <SketchUnderline />
+                  </h1>
                   <p className="lead">{SECTION_LEDE[active]}</p>
                 </div>
               </div>
@@ -1103,7 +1123,7 @@ function Shell() {
                   />
                 )}
                 {active === "approvals" && isStaff && <ApprovalsPanel onChanged={refreshDash} />}
-                {active === "verification" && (isFaculty || isSenior) && (
+                {active === "verification" && isFaculty && (
                   <VerificationPanel onChanged={refreshDash} />
                 )}
                 {active === "students" && (isAdmin || isSenior) && <StudentsPanel />}

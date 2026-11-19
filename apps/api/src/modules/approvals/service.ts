@@ -13,7 +13,7 @@ import {
 import { type SQL, and, asc, count, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import type { z } from "zod";
 import { env } from "../../config/env";
-import { type DbClient, getDb } from "../../db/client";
+import { type DbClient, getDb, raceAbort } from "../../db/client";
 import {
   events,
   approvalActions,
@@ -417,8 +417,60 @@ export async function inbox(auth: AuthContext, input: z.infer<typeof approvalInb
     .innerJoin(events, eq(events.id, approvalBundles.eventId))
     .innerJoin(clubs, eq(clubs.id, events.clubId))
     .where(where);
+
+  // What is actually being asked for. A resource request titled "Use Lab 2 for
+  // 3 hours" tells an approver nothing they cannot read; the inbox used to show
+  // only the request title, so the reviewer had to open each row to find out
+  // which room or device was at stake.
+  const requestIds = rows.slice(0, input.limit).map((r) => r.request.id);
+  const resourceRows = requestIds.length
+    ? await db
+        .select({
+          requestId: approvalRequestResources.requestId,
+          resourceName: resources.name,
+          unitLabel: resourceUnits.label,
+          startsAt: approvalRequestResources.startsAt,
+          endsAt: approvalRequestResources.endsAt,
+        })
+        .from(approvalRequestResources)
+        .innerJoin(resourceUnits, eq(resourceUnits.id, approvalRequestResources.resourceUnitId))
+        .innerJoin(resources, eq(resources.id, resourceUnits.resourceId))
+        .where(inArray(approvalRequestResources.requestId, requestIds))
+        .orderBy(asc(approvalRequestResources.startsAt), asc(resources.name))
+    : [];
+  const resourcesByRequest = new Map<string, typeof resourceRows>();
+  for (const row of resourceRows) {
+    const list = resourcesByRequest.get(row.requestId) ?? [];
+    list.push(row);
+    resourcesByRequest.set(row.requestId, list);
+  }
   return {
-    items: rows.slice(0, input.limit),
+    items: rows.slice(0, input.limit).map((row) => {
+      const asked = resourcesByRequest.get(row.request.id) ?? [];
+      return {
+        ...row,
+        // A resource request always names at least one; the array is empty for
+        // every other type, so one shape covers both cases.
+        resources: asked.map((r) => ({
+          resourceName: r.resourceName,
+          unitLabel: r.unitLabel,
+          startsAt: r.startsAt,
+          endsAt: r.endsAt,
+        })),
+        // Denormalised for the UI: "Computer Lab 2 · Lab 2 Room", or a count when
+        // several units are bundled into one request. Built from a destructured
+        // head rather than repeated indexing, so there is no non-null assertion to
+        // keep in step with the length check above.
+        resourceSummary: (() => {
+          const [first] = asked;
+          if (!first) return null;
+          const label = first.unitLabel
+            ? `${first.resourceName} · ${first.unitLabel}`
+            : first.resourceName;
+          return asked.length === 1 ? label : `${label} +${asked.length - 1} more`;
+        })(),
+      };
+    }),
     total: totalRow?.n ?? 0,
     limit: input.limit,
     offset: input.offset,
@@ -537,108 +589,114 @@ export async function decide(
   requestId: string,
   input: z.infer<typeof decisionSchema>,
   audit?: AuditContext,
+  signal?: AbortSignal,
 ) {
   const { db } = getDb();
-  const result = await db.transaction(async (tx) => {
-    // Row lock serialises concurrent decisions on the same request.
-    const [locked] = await tx
-      .select()
-      .from(approvalRequests)
-      .where(eq(approvalRequests.id, requestId))
-      .for("update");
-    if (!locked) throw new ApiError("NOT_FOUND", "Approval request not found.");
-    const ctx = await requestContext(tx, requestId);
-    if (ctx.bundle.supersededAt)
-      throw new ApiError("CONFLICT", "This request belongs to a superseded event revision.");
-    assertAuthority(auth, ctx);
-    assertPending(locked);
-    assertVersion(locked, input.expectedVersion);
-
-    const nextStatus = DECISION_RESULT_STATUS[input.action as DecisionAction];
-    if (input.action === "APPROVE" && locked.type === "RESOURCE_USE") {
-      // A resource hold is a commitment of the event as submitted. If a reviewer
-      // has sent the event back for changes — or a required rejection returned it
-      // to draft — approving the room/lab before the coordinator fixes the event
-      // would reserve campus space for something that is still moving.
-      const bundleRequests = await tx
+  const result = await raceAbort(
+    signal,
+    db.transaction(async (tx) => {
+      // Row lock serialises concurrent decisions on the same request.
+      const [locked] = await tx
         .select()
         .from(approvalRequests)
-        .where(eq(approvalRequests.bundleId, locked.bundleId));
-      const openChange = bundleRequests.some(
-        (request) =>
-          request.id !== requestId && request.isRequired && request.status === "CHANGES_REQUESTED",
-      );
-      if (ctx.event.status === "DRAFT" || openChange)
-        throw new ApiError(
-          "CONFLICT",
-          "The event has requested changes. The coordinator must fix and resubmit it before its resources can be approved.",
+        .where(eq(approvalRequests.id, requestId))
+        .for("update");
+      if (!locked) throw new ApiError("NOT_FOUND", "Approval request not found.");
+      const ctx = await requestContext(tx, requestId);
+      if (ctx.bundle.supersededAt)
+        throw new ApiError("CONFLICT", "This request belongs to a superseded event revision.");
+      assertAuthority(auth, ctx);
+      assertPending(locked);
+      assertVersion(locked, input.expectedVersion);
+
+      const nextStatus = DECISION_RESULT_STATUS[input.action as DecisionAction];
+      if (input.action === "APPROVE" && locked.type === "RESOURCE_USE") {
+        // A resource hold is a commitment of the event as submitted. If a reviewer
+        // has sent the event back for changes — or a required rejection returned it
+        // to draft — approving the room/lab before the coordinator fixes the event
+        // would reserve campus space for something that is still moving.
+        const bundleRequests = await tx
+          .select()
+          .from(approvalRequests)
+          .where(eq(approvalRequests.bundleId, locked.bundleId));
+        const openChange = bundleRequests.some(
+          (request) =>
+            request.id !== requestId &&
+            request.isRequired &&
+            request.status === "CHANGES_REQUESTED",
         );
-    }
-    if (input.action === "APPROVE") {
-      await confirmRequestHolds(tx, requestId);
-    } else {
-      await releaseRequestHolds(tx, requestId, `${input.action}: ${input.comment ?? ""}`.trim());
-    }
+        if (ctx.event.status === "DRAFT" || openChange)
+          throw new ApiError(
+            "CONFLICT",
+            "The event has requested changes. The coordinator must fix and resubmit it before its resources can be approved.",
+          );
+      }
+      if (input.action === "APPROVE") {
+        await confirmRequestHolds(tx, requestId);
+      } else {
+        await releaseRequestHolds(tx, requestId, `${input.action}: ${input.comment ?? ""}`.trim());
+      }
 
-    const [updated] = await tx
-      .update(approvalRequests)
-      .set({
-        status: nextStatus,
-        version: locked.version + 1,
-        decidedAt: input.action === "REQUEST_CHANGES" ? null : new Date(),
-        decidedBy: input.action === "REQUEST_CHANGES" ? null : auth.user.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(approvalRequests.id, requestId))
-      .returning();
+      const [updated] = await tx
+        .update(approvalRequests)
+        .set({
+          status: nextStatus,
+          version: locked.version + 1,
+          decidedAt: input.action === "REQUEST_CHANGES" ? null : new Date(),
+          decidedBy: input.action === "REQUEST_CHANGES" ? null : auth.user.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(approvalRequests.id, requestId))
+        .returning();
 
-    await tx.insert(approvalActions).values({
-      requestId,
-      actorId: auth.user.id,
-      action: input.action,
-      fromTier: locked.currentTier,
-      toTier: locked.currentTier,
-      fromStatus: locked.status,
-      toStatus: nextStatus,
-      comment: input.comment ?? null,
-      requestVersion: locked.version,
-    });
-
-    // A required rejection sends the event back to draft for a new revision.
-    if (
-      input.action === "REJECT" &&
-      locked.isRequired &&
-      ctx.event.status === "PENDING_APPROVALS"
-    ) {
-      await tx
-        .update(events)
-        .set({ status: "DRAFT", readyAt: null, updatedAt: new Date() })
-        .where(eq(events.id, ctx.event.id));
-    }
-    const event = await syncEventApprovalState(tx, ctx.event.id);
-
-    if (audit)
-      await insertAudit(tx, audit, {
-        action: `APPROVAL_${input.action}`,
-        entityType: "approval_request",
-        entityId: requestId,
-        clubId: ctx.club.id,
-        eventId: ctx.event.id,
-        before: { status: locked.status, version: locked.version, tier: locked.currentTier },
-        after: { status: nextStatus, version: locked.version + 1, comment: input.comment },
+      await tx.insert(approvalActions).values({
+        requestId,
+        actorId: auth.user.id,
+        action: input.action,
+        fromTier: locked.currentTier,
+        toTier: locked.currentTier,
+        fromStatus: locked.status,
+        toStatus: nextStatus,
+        comment: input.comment ?? null,
+        requestVersion: locked.version,
       });
 
-    await queueNotification(tx, {
-      kind: `APPROVAL_${input.action}`,
-      recipientUserId: ctx.request.createdBy,
-      eventId: ctx.event.id,
-      approvalRequestId: requestId,
-      subject: `${ctx.event.title}: ${locked.title} — ${nextStatus}`,
-      body: `Your request "${locked.title}" for ${ctx.event.title} is now ${nextStatus}.${input.comment ? `\n\nComment: ${input.comment}` : ""}`,
-    });
+      // A required rejection sends the event back to draft for a new revision.
+      if (
+        input.action === "REJECT" &&
+        locked.isRequired &&
+        ctx.event.status === "PENDING_APPROVALS"
+      ) {
+        await tx
+          .update(events)
+          .set({ status: "DRAFT", readyAt: null, updatedAt: new Date() })
+          .where(eq(events.id, ctx.event.id));
+      }
+      const event = await syncEventApprovalState(tx, ctx.event.id);
 
-    return { request: updated, event, club: ctx.club };
-  });
+      if (audit)
+        await insertAudit(tx, audit, {
+          action: `APPROVAL_${input.action}`,
+          entityType: "approval_request",
+          entityId: requestId,
+          clubId: ctx.club.id,
+          eventId: ctx.event.id,
+          before: { status: locked.status, version: locked.version, tier: locked.currentTier },
+          after: { status: nextStatus, version: locked.version + 1, comment: input.comment },
+        });
+
+      await queueNotification(tx, {
+        kind: `APPROVAL_${input.action}`,
+        recipientUserId: ctx.request.createdBy,
+        eventId: ctx.event.id,
+        approvalRequestId: requestId,
+        subject: `${ctx.event.title}: ${locked.title} — ${nextStatus}`,
+        body: `Your request "${locked.title}" for ${ctx.event.title} is now ${nextStatus}.${input.comment ? `\n\nComment: ${input.comment}` : ""}`,
+      });
+
+      return { request: updated, event, club: ctx.club };
+    }),
+  );
   return result;
 }
 

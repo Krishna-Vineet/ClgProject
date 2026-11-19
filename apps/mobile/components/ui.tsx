@@ -1,7 +1,5 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { useEffect, useRef } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Platform,
   Pressable,
@@ -11,6 +9,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useBreath, useEnter, useFloat, usePressScale, useSpin } from "../lib/motion";
+import { type Doodle, Sketch } from "./Sketch";
 
 /**
  * CampusOps mobile design tokens. Same "Ledger" language as the console:
@@ -39,6 +39,37 @@ export const colors = {
   warnBg: "#f7eed8",
   info: "#2b5875",
   infoBg: "#e5eef4",
+  // A single translucent scrim colour, so "raised" is a property of the system
+  // rather than a different shadow literal in every file.
+  shadow: "rgba(23,22,15,0.10)",
+  scrim: "rgba(23,22,15,0.28)",
+};
+
+/** The rounded-corner family. One scale, used everywhere. */
+export const radii = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
+
+/** "Apple-like" means a soft, low-contrast lift — not a drop shadow. */
+export const elevation = {
+  card: Platform.select({
+    ios: {
+      shadowColor: "#17160f",
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    android: { elevation: 2 },
+    default: { boxShadow: "0 10px 26px -18px rgba(23,22,15,0.28)" },
+  }) as object,
+  floating: Platform.select({
+    ios: {
+      shadowColor: "#17160f",
+      shadowOpacity: 0.14,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 10 },
+    },
+    android: { elevation: 8 },
+    default: { boxShadow: "0 18px 44px -22px rgba(23,22,15,0.38)" },
+  }) as object,
 };
 
 export const fonts = {
@@ -59,22 +90,77 @@ export const fonts = {
   }) as string,
 };
 
+/**
+ * Ambient artwork behind every screen.
+ *
+ * Two faint doodles that drift a few pixels, at 12% opacity. It is the same
+ * drawing on every tab — a campus and a wave — so the app has a consistent
+ * backdrop rather than a different decoration per screen, and because it sits at
+ * z-index 0 under the content it never competes with the type.
+ */
+function Ambient() {
+  const drift = useFloat(7, 6400);
+  const drift2 = useFloat(10, 8200);
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={{ position: "absolute", top: -18, right: -30, transform: [{ translateY: drift }] }}
+      >
+        <Sketch name="campus" size={210} faint />
+      </Animated.View>
+      <Animated.View
+        style={{ position: "absolute", bottom: 40, left: -46, transform: [{ translateY: drift2 }] }}
+      >
+        <Sketch name="wave" size={240} faint />
+      </Animated.View>
+      <Animated.View
+        style={{
+          position: "absolute",
+          top: "46%",
+          right: -54,
+          transform: [{ translateY: drift2 }],
+        }}
+      >
+        <Sketch name="sparkle" size={150} faint />
+      </Animated.View>
+      {/* Skew topology: the backdrop is cut by a wide, tilted bed rather than
+          sitting on a rectangle grid. Two bands at opposite angles give every
+          screen a diagonal composition while staying fully behind the type. */}
+      <Animated.View
+        style={[s.skewBand, { top: -140, transform: [{ skewY: "-4deg" }, { translateY: drift }] }]}
+      />
+      <Animated.View
+        style={[
+          s.skewBandSoft,
+          { bottom: -90, transform: [{ skewY: "3deg" }, { translateY: drift2 }] },
+        ]}
+      />
+    </View>
+  );
+}
+
 export function Screen({
   children,
   scroll = true,
   bottomGap = 120,
-}: PropsWithChildren<{ scroll?: boolean; bottomGap?: number }>) {
-  return scroll ? (
-    <ScrollView
-      style={s.page}
-      contentContainerStyle={[s.content, { paddingBottom: bottomGap }]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      {children}
-    </ScrollView>
-  ) : (
-    <View style={[s.page, s.content]}>{children}</View>
+  ambient = true,
+}: PropsWithChildren<{ scroll?: boolean; bottomGap?: number; ambient?: boolean }>) {
+  return (
+    <View style={s.page}>
+      {ambient ? <Ambient /> : null}
+      {scroll ? (
+        <ScrollView
+          style={s.page}
+          contentContainerStyle={[s.content, { paddingBottom: bottomGap }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={[s.page, s.content]}>{children}</View>
+      )}
+    </View>
   );
 }
 
@@ -84,15 +170,19 @@ export function Card({
   action,
   subtitle,
   tone,
+  index = 0,
 }: PropsWithChildren<{
   title?: string;
   subtitle?: string;
   action?: ReactNode;
   tone?: "paper" | "ink";
+  /** Position in the screen, used only to stagger the entrance. */
+  index?: number;
 }>) {
   const dark = tone === "ink";
+  const enter = useEnter(Math.min(index, 6) * 55);
   return (
-    <View style={[s.card, dark && s.cardInk]}>
+    <Animated.View style={[s.card, dark && s.cardInk, enter]}>
       {(title || action || subtitle) && (
         <View style={s.cardHead}>
           <View style={{ flex: 1, gap: 2 }}>
@@ -107,7 +197,7 @@ export function Card({
         </View>
       )}
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -127,9 +217,26 @@ export function Title({
       <Text style={s.title} accessibilityRole="header">
         {title}
       </Text>
+      <View style={s.titleRule}>
+        <AnimatedRule />
+        <AnimatedRule delay={120} small />
+      </View>
       {subtitle && <Text style={s.muted}>{subtitle}</Text>}
     </View>
   );
+}
+
+/**
+ * A hairline that draws itself in under the page title — tilted, not level.
+ *
+ * The skew is the cheapest way to break the "stack of rectangles" look: the eye
+ * reads the page as a sheet with a cut edge instead of a table of boxes. Two
+ * rules at different angles (one long, one short) read as a drawn mark rather
+ * than a border.
+ */
+function AnimatedRule({ delay = 40, small = false }: { delay?: number; small?: boolean }) {
+  const enter = useEnter(delay, 0);
+  return <Animated.View style={[s.titleRuleBar, small && s.titleRuleBarSmall, enter]} />;
 }
 
 export function SectionLabel({ children }: PropsWithChildren) {
@@ -140,6 +247,14 @@ export function Muted({ children }: PropsWithChildren) {
   return <Text style={s.muted}>{children}</Text>;
 }
 
+/**
+ * A pressable that answers the finger.
+ *
+ * The old button only changed opacity. A spring scale reads as physical, which is
+ * the single biggest difference between a web form and a native one. The scale
+ * runs on the animation thread, so it does not stutter while the JS thread is
+ * busy parsing a response.
+ */
 export function Button({
   label,
   onPress,
@@ -147,6 +262,7 @@ export function Button({
   variant = "primary",
   busy,
   testID,
+  icon,
 }: {
   label: string;
   onPress: () => void;
@@ -154,34 +270,102 @@ export function Button({
   variant?: "primary" | "ghost" | "danger";
   busy?: boolean;
   testID?: string;
+  icon?: Doodle;
 }) {
   const inactive = disabled || busy;
+  const press = usePressScale();
   const textColor =
     variant === "primary" ? colors.cream : variant === "danger" ? colors.bad : colors.ink;
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Animated.View style={[press.style, inactive && s.disabled, s.buttonWrap]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        testID={testID}
+        accessibilityState={{ disabled: Boolean(inactive), busy: Boolean(busy) }}
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        disabled={inactive}
+        style={[
+          s.button,
+          variant === "ghost" && s.ghost,
+          variant === "danger" && s.danger,
+          variant === "primary" && elevation.card,
+        ]}
+      >
+        {busy ? (
+          <Spinner color={textColor} size={16} />
+        ) : (
+          <>
+            {icon ? <Sketch name={icon} size={17} color={textColor} strokeWidth={2.4} /> : null}
+            <Text style={[s.buttonText, { color: textColor }]} numberOfLines={1}>
+              {label}
+            </Text>
+          </>
+        )}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/**
+ * The app's own spinner.
+ *
+ * `ActivityIndicator` is a platform view: it looks different on iOS, Android and
+ * the browser, and on the web it is a CSS ring we do not control. Two Views
+ * rotating at 1100 ms looks the same everywhere and inherits the text colour.
+ */
+export function Spinner({ color = colors.ink, size = 16 }: { color?: string; size?: number }) {
+  const spin = useSpin(1000);
+  return (
+    <Animated.View
+      accessibilityLabel="Working"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: Math.max(1.6, size / 9),
+        borderColor: "rgba(0,0,0,0.14)",
+        borderTopColor: color,
+        transform: [{ rotate: spin }],
+      }}
+    />
+  );
+}
+
+/**
+ * A full-screen dim while the whole screen is working (submitting, scanning,
+ * minting a code). It blocks touches, so a double-tap cannot replay the action,
+ * and it dims rather than blanks: the student keeps their place.
+ */
+export function ScreenOverlay({ visible, label }: { visible: boolean; label?: string }) {
+  const enter = useEnter(0, 0);
+  if (!visible) return null;
+  return (
+    <Animated.View style={[s.overlay, enter]} pointerEvents="auto" accessibilityViewIsModal>
+      <View style={[s.overlayCard, elevation.floating]}>
+        <Sketch name="sparkle" size={54} />
+        <Spinner size={20} />
+        {label ? <Text style={s.sectionLabel}>{label}</Text> : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+/** A pull-down-to-refresh style indicator for a screen's first load. */
+export function ScreenLoader({ label = "Loading…" }: { label?: string }) {
+  const enter = useEnter();
+  return (
+    <Animated.View
+      style={[s.screenLoader, enter]}
+      accessibilityRole="progressbar"
       accessibilityLabel={label}
-      testID={testID}
-      accessibilityState={{ disabled: Boolean(inactive), busy: Boolean(busy) }}
-      onPress={onPress}
-      disabled={inactive}
-      style={({ pressed }) => [
-        s.button,
-        variant === "ghost" && s.ghost,
-        variant === "danger" && s.danger,
-        inactive && s.disabled,
-        pressed && !inactive && s.pressed,
-      ]}
     >
-      {busy ? (
-        <ActivityIndicator color={textColor} size="small" />
-      ) : (
-        <Text style={[s.buttonText, { color: textColor }]} numberOfLines={1}>
-          {label}
-        </Text>
-      )}
-    </Pressable>
+      <Sketch name="clock" size={86} faint={false} />
+      <Spinner size={22} />
+      <Text style={s.sectionLabel}>{label}</Text>
+    </Animated.View>
   );
 }
 
@@ -238,17 +422,22 @@ export function Chip({
   selected,
   onPress,
 }: { label: string; selected?: boolean; onPress: () => void }) {
+  const press = usePressScale();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: Boolean(selected) }}
-      onPress={onPress}
-      style={({ pressed }) => [s.chip, selected && s.chipSelected, pressed && { opacity: 0.85 }]}
-    >
-      <Text style={[s.chipText, selected && { color: colors.cream }]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+    <Animated.View style={press.style}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: Boolean(selected) }}
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={[s.chip, selected && s.chipSelected]}
+      >
+        <Text style={[s.chipText, selected && { color: colors.cream }]} numberOfLines={1}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -324,27 +513,12 @@ export function Note({
   );
 }
 
-function usePulse() {
-  const value = useRef(new Animated.Value(0.45)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(value, { toValue: 1, duration: 850, useNativeDriver: true }),
-        Animated.timing(value, { toValue: 0.45, duration: 850, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [value]);
-  return value;
-}
-
 export function Skeleton({
   height = 14,
   width = "100%",
   radius = 6,
 }: { height?: number; width?: number | `${number}%`; radius?: number }) {
-  const opacity = usePulse();
+  const opacity = useBreath(0.4, 1);
   return (
     <Animated.View
       accessibilityElementsHidden
@@ -354,13 +528,22 @@ export function Skeleton({
   );
 }
 
-export function Loading({ label = "Loading…" }: { label?: string }) {
+export function Loading({
+  label = "Loading…",
+  cards = 2,
+  doodle,
+}: { label?: string; cards?: number; doodle?: Doodle }) {
   return (
     <View style={s.loading} accessibilityLabel={label} accessibilityRole="progressbar">
-      <Text style={s.sectionLabel}>{label}</Text>
+      <View style={s.loadingHead}>
+        <Sketch name={doodle ?? "clock"} size={44} faint />
+        <Spinner size={15} />
+        <Text style={s.sectionLabel}>{label}</Text>
+      </View>
       <Skeleton height={16} width="46%" />
-      <Skeleton height={72} radius={12} />
-      <Skeleton height={72} radius={12} />
+      {Array.from({ length: cards }, (_, i) => `sk-${i}`).map((id) => (
+        <Skeleton key={id} height={72} radius={radii.md} />
+      ))}
     </View>
   );
 }
@@ -368,16 +551,17 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
 export function Empty({
   title,
   detail,
-  icon,
-}: { title: string; detail?: string; icon?: ReactNode }) {
+  doodle = "sparkle",
+}: { title: string; detail?: string; doodle?: Doodle }) {
+  const enter = useEnter();
   return (
-    <View style={s.empty}>
-      <View style={s.emptyMark}>{icon ?? <View style={s.emptyDot} />}</View>
+    <Animated.View style={[s.empty, enter]}>
+      <Sketch name={doodle} size={64} />
       <View style={{ flex: 1, gap: 3 }}>
         <Text style={s.cardTitle}>{title}</Text>
         {detail && <Text style={s.muted}>{detail}</Text>}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -404,7 +588,20 @@ const s = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  titleBlock: { gap: 6, marginBottom: 4, paddingTop: 10 },
+  titleBlock: { gap: 6, marginBottom: 6, paddingTop: 10 },
+  titleRule: { height: 10, marginTop: 2, flexDirection: "row", alignItems: "center", gap: 6 },
+  titleRuleBar: {
+    height: 2.5,
+    width: 68,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+    transform: [{ skewX: "-24deg" }],
+  },
+  titleRuleBarSmall: {
+    width: 16,
+    height: 2,
+    backgroundColor: colors.lineStrong,
+  },
   eyebrowRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   eyebrowMark: { width: 5, height: 5, borderRadius: 1, backgroundColor: colors.primary },
   eyebrow: {
@@ -417,7 +614,7 @@ const s = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontSize: 31,
+    fontSize: 34,
     fontFamily: fonts.display,
     fontWeight: "500",
     letterSpacing: -0.6,
@@ -425,11 +622,11 @@ const s = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: radii.xl,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.line,
-    padding: 16,
-    gap: 11,
+    padding: 18,
+    gap: 12,
   },
   cardInk: { backgroundColor: colors.dark, borderColor: colors.dark },
   cardHead: {
@@ -455,8 +652,8 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
   button: {
-    minHeight: 46,
-    borderRadius: 9,
+    minHeight: 50,
+    borderRadius: radii.md,
     backgroundColor: colors.dark,
     alignItems: "center",
     justifyContent: "center",
@@ -475,9 +672,9 @@ const s = StyleSheet.create({
   field: { gap: 5 },
   label: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
   input: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.lineStrong,
-    borderRadius: 8,
+    borderRadius: radii.md,
     backgroundColor: colors.card,
     color: colors.ink,
     paddingHorizontal: 12,
@@ -488,9 +685,9 @@ const s = StyleSheet.create({
   textarea: { minHeight: 104, textAlignVertical: "top" },
   hint: { color: colors.muted, fontSize: 11.5, lineHeight: 17 },
   chip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: colors.lineStrong,
@@ -526,28 +723,41 @@ const s = StyleSheet.create({
   },
   noteMark: { width: 3, borderRadius: 2, alignSelf: "stretch", minHeight: 16, marginTop: 2 },
   loading: { gap: 10, paddingVertical: 8 },
-  empty: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.lineStrong,
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "rgba(240,236,225,0.4)",
-  },
-  emptyMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cardAlt,
+  loadingHead: { flexDirection: "row", alignItems: "center", gap: 9 },
+  screenLoader: {
     alignItems: "center",
     justifyContent: "center",
+    gap: 12,
+    paddingVertical: 48,
   },
-  emptyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.lineStrong },
+  buttonWrap: { alignSelf: "stretch" },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.scrim,
+    zIndex: 40,
+  },
+  overlayCard: {
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 26,
+    paddingVertical: 22,
+    borderRadius: radii.xl,
+    backgroundColor: colors.card,
+  },
+  empty: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "center",
+    borderRadius: radii.lg,
+    padding: 18,
+    backgroundColor: colors.cardAlt,
+  },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -565,6 +775,22 @@ const s = StyleSheet.create({
     textAlign: "right",
   },
   divider: { height: 1, backgroundColor: colors.line },
+  /* The two tilted beds behind the content. Kept very low contrast so the app
+     still reads as paper: they are a change of angle, not a change of colour. */
+  skewBand: {
+    position: "absolute",
+    left: "-30%",
+    right: "-30%",
+    height: 340,
+    backgroundColor: "rgba(176,71,43,0.045)",
+  },
+  skewBandSoft: {
+    position: "absolute",
+    left: "-30%",
+    right: "-30%",
+    height: 300,
+    backgroundColor: "rgba(23,22,15,0.035)",
+  },
   checkbox: {
     flexDirection: "row",
     alignItems: "flex-start",

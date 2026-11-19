@@ -2,6 +2,8 @@ import { APPROVAL_TIERS } from "@campusops/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { authenticate, requireActiveAccount } from "../../middleware/auth";
+// Side-effect import: registers the requestSignal context variable's type.
+import "../../middleware/request-timeout";
 import { rateLimit } from "../../middleware/rate-limit";
 import { parseJson, parseQuery } from "../../middleware/validate";
 import { ApiError } from "../../utils/api-error";
@@ -34,7 +36,18 @@ approvalRequestRoutes.post(
   rateLimit({ windowMs: 60_000, max: 60, prefix: "approval-decision" }),
   async (c) => {
     const input = await parseJson(c, schemas.decisionSchema);
-    return ok(c, await service.decide(c.get("auth"), c.req.param("id"), input, auditContext(c)));
+    return ok(
+      c,
+      await service.decide(
+        c.get("auth"),
+        c.req.param("id"),
+        input,
+        auditContext(c),
+        // The timeout guard aborts this when it gives up, which rolls the
+        // transaction back instead of leaving it holding the row lock.
+        c.get("requestSignal"),
+      ),
+    );
   },
 );
 

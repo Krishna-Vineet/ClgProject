@@ -376,7 +376,10 @@ export function ClubsPanel() {
         }}
         footer={
           <>
-            {selected && canManage && (
+            {/* The club itself (name, department, description) is institution-level
+                data. Members and events belong to the lead; the club's identity
+                belongs to whoever administers the institution. */}
+            {selected && isAdmin && (
               <button type="button" className="ghost" onClick={() => setEditing(selected)}>
                 Edit club
               </button>

@@ -2,6 +2,12 @@ import { DEFAULT_CAMPUS_TIMEZONE, DEFAULT_QR_TTL_SECONDS } from "@campusops/shar
 import { z } from "zod";
 
 const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
+// A trailing newline from `echo >> .env`, or "S3" instead of "s3", is the same
+// intention written differently. Trimming and lower-casing here means a value
+// that only differs by whitespace or case still turns storage on, while a value
+// that is actually wrong is still rejected with the name of the variable.
+const enumFromEnv = <T extends readonly [string, ...string[]]>(values: T) =>
+  z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : v), z.enum(values));
 const boolFromEnv = (defaultValue: boolean) =>
   z.preprocess((v) => {
     if (v === "" || v === undefined) return defaultValue;
@@ -64,7 +70,15 @@ const envSchema = z
 
     JWT_ACCESS_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
     REFRESH_TOKEN_PEPPER: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
-    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    // How long an access token is accepted. The old default was 15 minutes, short
+    // enough that an organiser halfway through filling an event form could have a
+    // request fail mid-save; the refresh path is transparent, but every expiry is
+    // still a race with a write. An hour is the common default for a first-party
+    // web client with an httpOnly refresh token behind it, and the refresh token
+    // (30 days, rotated, reuse-detected) is what actually bounds a session.
+    // Raise it further with this variable; the cap is a day so a leaked token
+    // still dies.
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(3600),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(600),
     OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
@@ -86,7 +100,7 @@ const envSchema = z
     EMAIL_PROVIDER_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
 
     // Private object storage. Disabled is explicit; s3 requires the full variable group.
-    STORAGE_MODE: z.enum(["disabled", "s3"]).default("disabled"),
+    STORAGE_MODE: enumFromEnv(["disabled", "s3"]).default("disabled"),
     AWS_ENDPOINT_URL_S3: z.preprocess(emptyToUndefined, z.string().url().optional()),
     AWS_ACCESS_KEY_ID: z.preprocess(emptyToUndefined, z.string().optional()),
     AWS_SECRET_ACCESS_KEY: z.preprocess(emptyToUndefined, z.string().optional()),

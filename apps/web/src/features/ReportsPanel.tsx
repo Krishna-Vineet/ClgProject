@@ -4,12 +4,11 @@ import {
   ApprovalBadge,
   Card,
   Empty,
-  ErrorNote,
   EventBadge,
   Field,
   ReservationBadge,
-  SuccessNote,
   formatWhen,
+  useNotice,
 } from "../components/ui";
 import { type Page, api, errorMessage, getAccessToken } from "../lib/api";
 import type { EventRow } from "../lib/types";
@@ -90,8 +89,14 @@ type Snapshot = {
     checkedInAt: string | null;
   }>;
   notes: string | null;
-  integrity: { checksum: string };
+  /** Present on a filed report; a preview computes the same value beside it. */
+  integrity?: { algorithm: string; checksum: string } | undefined;
 };
+
+/** The checksum a snapshot carries, whether filed or previewed. */
+function checksumOf(snapshot: Snapshot | null): string | null {
+  return snapshot?.integrity?.checksum ?? null;
+}
 
 /**
  * Post-event reports. Anyone with institutional access (coordinators, involved
@@ -107,6 +112,9 @@ export function ReportsPanel() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Every panel message is a toast: it appears where the eye is, including
+  // over an open dialog, instead of in a bar at the top of the card.
+  useNotice(error, notice);
   const [busy, setBusy] = useState(false);
   // Guards against out-of-order responses: opening an older version must never
   // overwrite a snapshot the user has just generated.
@@ -171,9 +179,18 @@ export function ReportsPanel() {
     setError(null);
     setNotice(null);
     try {
-      const result = await api<{ snapshot: Snapshot }>(`/events/${eventId}/report-preview`);
+      const result = await api<{ snapshot: Snapshot; checksum?: string }>(
+        `/events/${eventId}/report-preview`,
+      );
       if (seq !== loadSeq.current) return;
-      setSnapshot(result.snapshot);
+      // Normalise: an older server sent the checksum beside the snapshot rather
+      // than inside it. Fold both shapes into one so the render below has a
+      // single source of truth.
+      setSnapshot(
+        result.snapshot.integrity || !result.checksum
+          ? result.snapshot
+          : { ...result.snapshot, integrity: { algorithm: "sha256", checksum: result.checksum } },
+      );
       setNotice("Preview only — nothing has been filed yet.");
     } catch (err) {
       setError(errorMessage(err));
@@ -272,8 +289,6 @@ export function ReportsPanel() {
             </span>
           </div>
         )}
-        <ErrorNote message={error} />
-        <SuccessNote message={notice} />
       </Card>
 
       {eventId && (
@@ -566,8 +581,14 @@ export function ReportsPanel() {
           )}
 
           <Card title="Record integrity">
-            <p className="muted">SHA-256 of the filed snapshot</p>
-            <code className="checksum">{snapshot.integrity.checksum}</code>
+            <p className="muted">
+              {snapshot.integrity ? "SHA-256 of the filed snapshot" : "SHA-256 of this preview"}
+            </p>
+            {/* Optional by construction: a preview is rendered before anything is
+                filed. Reading straight through `snapshot.integrity.checksum`
+                crashed the whole panel when it was absent — a preview should
+                degrade to "not yet filed", never to a blank screen. */}
+            <code className="checksum">{checksumOf(snapshot) ?? "Not available"}</code>
           </Card>
         </>
       )}

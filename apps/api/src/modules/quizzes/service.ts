@@ -293,6 +293,16 @@ export async function setStatus(
           "INVALID_STATE_TRANSITION",
           "Publish the event before opening its quiz.",
         );
+      // Drafting a quiz ahead of a switch to quiz admission is allowed, but
+      // opening it is not: a PUBLISHED quiz shows up in participants' apps,
+      // invites them to sit it, and then refuses every attempt with "not part of
+      // the event's admission process". Fail where the coordinator can still do
+      // something about it.
+      if (!event || !QUIZ_ADMISSION[event.admissionMode])
+        throw new ApiError(
+          "INVALID_STATE_TRANSITION",
+          `This event admits people by ${event?.admissionMode ?? "another method"}, so its quiz can be prepared but not opened. Change the admission mode to a quiz mode first.`,
+        );
     }
     if (now > quiz.closesAt)
       throw new ApiError(

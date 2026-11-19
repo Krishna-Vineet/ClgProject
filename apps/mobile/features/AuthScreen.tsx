@@ -293,11 +293,17 @@ export function AuthScreen() {
         )}
         {mode === "college" && (
           <>
+            {/* One identifier, not two. Registration collects the roll number and
+                that is what a gate check compares against; asking for a separate
+                "college ID number" as well meant students entered the same value
+                twice, or entered something nothing ever looked at. */}
             <Field
-              label="College ID number"
+              label="Roll number"
               value={rollNumber}
               onChangeText={setRollNumber}
-              placeholder="As printed on your college ID"
+              placeholder="As printed on your ID card"
+              hint="Your college roll number doubles as your ID at the gate."
+              testID="roll-number"
             />
             <View style={{ gap: 8 }}>
               <Text style={{ fontWeight: "600" }}>Programme</Text>

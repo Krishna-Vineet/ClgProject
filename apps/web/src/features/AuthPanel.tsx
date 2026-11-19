@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Icon } from "../components/icons";
-import { Card, ErrorNote, Field, SuccessNote } from "../components/ui";
+import { Card, Field, useNotice } from "../components/ui";
 import { api, errorMessage } from "../lib/api";
 
 type Config = {
@@ -48,6 +48,9 @@ export function AuthPanel({
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Every panel message is a toast: it appears where the eye is, including
+  // over an open dialog, instead of in a bar at the top of the card.
+  useNotice(error, notice);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
@@ -218,9 +221,6 @@ export function AuthPanel({
           </span>
         </p>
       )}
-
-      <ErrorNote message={error} />
-      <SuccessNote message={notice} />
 
       {mode === "login" && (
         <div className="auth-alt">

@@ -223,10 +223,14 @@ describe("participant registration", () => {
     const res = await register(ids.fcfs as string, "outsider");
     expect(res.status).toBe(404);
   });
-  test("outsiders can register for public events", async () => {
-    expect((await register(ids.public as string, "outsider")).json.data.registration.status).toBe(
-      "CONFIRMED",
-    );
+  test("outsiders can register for public events, and arrive as applications", () => {
+    // An outsider has no department and no batch, so the campus rules cannot judge
+    // them — they are never auto-confirmed and never silently refused. The
+    // organiser decides, and a pass is issued only after that decision.
+    return register(ids.public as string, "outsider").then((res) => {
+      expect(res.json.data.registration.status).toBe("APPLIED");
+      expect(res.json.data.passId).toBeNull();
+    });
   });
   test("invited-only events require a live invitation", async () => {
     expect((await register(ids.invited as string, "a")).status).toBe(404);

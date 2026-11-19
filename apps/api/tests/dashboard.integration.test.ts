@@ -94,11 +94,16 @@ describe("management dashboard", () => {
     expect(s.json.data.work.approvalsPending).toBe(0);
   });
 
-  test("HOD/Dean sees department scope and verification workload", async () => {
+  test("HOD/Dean sees department scope, and no verification queue they cannot act on", async () => {
     const token = await login("hoddean.cse@demo.campusops.local");
     const d = (await get("/me/dashboard", token)).json.data;
     expect(d.scope).toBe("DEPARTMENT");
-    expect(d.work.verificationPending).toBeGreaterThanOrEqual(1);
+    // Verifying a student is a FACULTY action (`GET /faculty/verification-queue`
+    // is faculty-only), so an HOD/Dean dashboard must not advertise a pending
+    // verification count they have no page to clear. Their student detail page
+    // carries the verification state instead. This used to assert >= 1, which is
+    // the dead end that was reported.
+    expect(d.work.verificationPending).toBe(0);
   });
 
   test("/me/events honours status and q filters", async () => {

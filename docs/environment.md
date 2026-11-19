@@ -37,7 +37,7 @@ Groups, with defaults from `apps/api/src/config/env.ts`:
 
 - **Runtime**: `NODE_ENV`, `PORT` (8787), `WEB_ORIGIN` (exact website origin, CORS), `APP_BASE_URL` (website URL used in emails), `CAMPUS_TIMEZONE` (Asia/Kolkata), `TRUST_PROXY_HEADERS` (true only behind Render/Vercel which strip client forwarding headers), `TRUSTED_PROXY_HOPS` (how many hops to count from the right edge of `X-Forwarded-For`; 1 for Vercel/Render, 2 behind a load balancer), `MOBILE_SCHEME` (campusops), `COMPLAINT_QR_BASE` (campusops://complaint), `INSTITUTION_NAME`, `REQUEST_TIMEOUT_MS` (20000).
 - **Timeouts**: `REQUEST_TIMEOUT_MS` bounds one request end to end and is also sent to Postgres as `statement_timeout`, so a lock wait cannot occupy a pool slot forever. A request that exceeds it returns 504 `REQUEST_TIMEOUT`.
-- **Auth**: `ACCESS_TOKEN_TTL_SECONDS` (900), `REFRESH_TOKEN_TTL_DAYS` (30), `OTP_TTL_SECONDS` (600), `OTP_MAX_ATTEMPTS` (5).
+- **Auth**: `ACCESS_TOKEN_TTL_SECONDS` (3600, max 86400), `REFRESH_TOKEN_TTL_DAYS` (30), `OTP_TTL_SECONDS` (600), `OTP_MAX_ATTEMPTS` (5).
 - **Demo**: `DEMO_MODE`, `ALLOW_PRODUCTION_DEMO`, `EMAIL_MODE` (demo/brevo/resend), `EXPOSE_DEMO_OTP`, `SEED_DEMO_PASSWORD`. Production refuses demo email unless `ALLOW_PRODUCTION_DEMO=true`; `SEED_DEMO_PASSWORD` is refused in production. Keep all false/unset in production.
 - **Email**: `EMAIL_FROM` (verified sender), `BREVO_API_KEY` (you already have it; never share it), or `RESEND_API_KEY`.
 - **Storage**: `STORAGE_MODE` (disabled/s3), `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET`, `S3_SIGNED_URL_TTL_SECONDS` (300), `UPLOAD_MAX_BYTES` (5 MiB).

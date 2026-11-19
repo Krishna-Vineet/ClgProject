@@ -11,7 +11,7 @@ import {
 } from "react";
 import { errorMessage } from "../lib/api";
 import { Icon } from "./icons";
-import { Skeleton } from "./ui";
+import { LoadingPanel } from "./loaders";
 
 type ToastKind = "ok" | "err" | "info";
 type Toast = { id: number; kind: ToastKind; text: string; leaving?: boolean };
@@ -383,17 +383,13 @@ export function FormDialog({
  * In-panel loading placeholder. It renders the shape of content rather than a
  * spinner, so the layout does not jump when the request resolves.
  */
+/**
+ * The standard block loader. It carries a spinner as well as skeleton lines:
+ * the skeletons announce the shape of what is coming, the spinner proves the app
+ * is still alive when the request is slow.
+ */
 export function Loading({ label = "Loading" }: { label?: string }) {
-  return (
-    <div className="loading-block" aria-busy="true" aria-label={label}>
-      <span className="loading-label">{label}</span>
-      <span className="skeleton-text" aria-hidden="true">
-        <Skeleton height={12} width="46%" />
-        <Skeleton height={12} width="88%" />
-        <Skeleton height={12} width="72%" />
-      </span>
-    </div>
-  );
+  return <LoadingPanel label={label} />;
 }
 
 export function Forbidden({ what }: { what: string }) {

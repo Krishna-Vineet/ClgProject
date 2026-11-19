@@ -238,8 +238,45 @@ export async function getOwnedFile(ownerId: string, fileId: string) {
   return file;
 }
 
+/**
+ * What clients need to know about storage, including *why* it is off.
+ *
+ * The clients used to infer availability from `mode === "s3"` alone, so a server
+ * that had the S3 group set but `STORAGE_MODE=disabled` (the default in
+ * `.env.example`) left the app saying "ask your administrator to enable storage"
+ * with nothing to check. `enabled` is the server's answer to the only question
+ * clients actually ask, and `reason` names the variable to fix when it is false.
+ */
+/** The S3 variables that are still unset, named so the message can say which. */
+function missingS3Keys(): string[] {
+  return (
+    [
+      ["AWS_ENDPOINT_URL_S3", env.AWS_ENDPOINT_URL_S3],
+      ["AWS_ACCESS_KEY_ID", env.AWS_ACCESS_KEY_ID],
+      ["AWS_SECRET_ACCESS_KEY", env.AWS_SECRET_ACCESS_KEY],
+      ["S3_BUCKET", env.S3_BUCKET],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+}
+
 export function storagePublicConfig() {
-  return { mode: env.STORAGE_MODE, maxBytes: env.UPLOAD_MAX_BYTES, allowed: ALLOWED };
+  const cfg = storageConfig();
+  let reason: string | null = null;
+  if (!cfg) {
+    reason =
+      env.STORAGE_MODE !== "s3"
+        ? `Secure storage is off because STORAGE_MODE is "${env.STORAGE_MODE}". Set STORAGE_MODE=s3.`
+        : `Secure storage is off because the S3 environment group is incomplete (check ${missingS3Keys().join(", ")}).`;
+  }
+  return {
+    mode: env.STORAGE_MODE,
+    enabled: cfg !== null,
+    reason,
+    maxBytes: env.UPLOAD_MAX_BYTES,
+    allowed: ALLOWED,
+  };
 }
 
 /** Reports can be archived only when real object storage is configured. */

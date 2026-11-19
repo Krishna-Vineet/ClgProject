@@ -140,14 +140,16 @@ export async function dashboard(auth: AuthContext) {
   const sum = (...keys: Array<typeof events.$inferSelect.status>) =>
     keys.reduce((a, k) => a + (byStatus.get(k) ?? 0), 0);
 
+  // Only a FACULTY holder can verify a student, so only a FACULTY holder is told
+  // there is verifying to do. An HOD counting an unreadable queue is a task
+  // they cannot complete.
   let verificationPending = 0;
-  if (hasRole(auth, "FACULTY") || hasRole(auth, "HOD_DEAN")) {
+  if (hasRole(auth, "FACULTY")) {
     const fac = departmentScope(auth, "FACULTY");
-    const hod = departmentScope(auth, "HOD_DEAN");
     const parts: SQL[] = [];
-    if (fac.global || hod.global) parts.push(sql`true`);
-    const depts = [...new Set([...fac.departmentIds, ...hod.departmentIds])];
-    if (depts.length) parts.push(inArray(studentProfiles.departmentId, depts));
+    if (fac.global) parts.push(sql`true`);
+    if (fac.departmentIds.length)
+      parts.push(inArray(studentProfiles.departmentId, fac.departmentIds));
     if (parts.length) {
       const [row] = await db
         .select({ n: count() })

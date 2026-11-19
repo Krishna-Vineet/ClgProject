@@ -254,10 +254,15 @@ export async function decideApplication(
   audit?: AuditContext,
 ) {
   const event = await assertEventManage(auth, eventId);
-  if (event.admissionMode !== "MANUAL")
+  // Outsider sign-ups always wait for a human, whatever the event's admission
+  // mode is: an outside institution's students are guests, and a guest list is
+  // the organiser's call. Manual-admission events work the same way for
+  // everybody. Both therefore have applications to decide.
+  const decidesApplications = event.admissionMode === "MANUAL" || event.audience !== "COLLEGE_ONLY";
+  if (!decidesApplications)
     throw new ApiError(
       "VALIDATION_ERROR",
-      "Only manual-admission events have applications to decide.",
+      "Only manual-admission events, or events open to outsiders, have applications to decide.",
     );
   const { db } = getDb();
   return db.transaction(async (tx) => {

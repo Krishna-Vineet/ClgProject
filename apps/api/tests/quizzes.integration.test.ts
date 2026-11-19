@@ -612,6 +612,17 @@ describe("quiz editing guards", () => {
       tokens.lead,
     );
     expect(res.status).toBe(200);
+    // Inert means inert: it must not be openable either, or it would appear to
+    // participants as a paper whose every attempt is refused.
+    const quizId = res.json.data.id;
+    const opened = await req(
+      "PATCH",
+      `/api/v1/quizzes/${quizId}/status`,
+      { status: "PUBLISHED" },
+      tokens.lead,
+    );
+    expect(opened.status).toBe(409);
+    expect(opened.json.error.message).toContain("can be prepared but not opened");
     // The quiz is inert while the event still admits participants first-come-first-served.
     const attempt = await req("POST", `/api/v1/events/${event?.id}/quiz/attempts`, {}, tokens.s1);
     expect(attempt.status).toBe(400);
